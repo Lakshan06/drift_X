@@ -11,7 +11,7 @@ import timber.log.Timber
 import java.time.Instant
 
 /**
- * ViewModel for AI Assistant Chat feature
+ * ViewModel for PatchBot Chat feature
  */
 class AIAssistantViewModel(
     private val aiEngine: AIAnalysisEngine
@@ -24,13 +24,13 @@ class AIAssistantViewModel(
     private val conversationHistory = mutableListOf<String>()
 
     init {
-        Timber.d("🔍 AIAssistantViewModel init - AI always available (fallback mode)")
+        Timber.d("🔍 AIAssistantViewModel init - PatchBot always available (fallback mode)")
         checkAIAvailability()
     }
 
     private fun checkAIAvailability() {
         viewModelScope.launch {
-            Timber.d("🔍 AI is always available using instant fallback responses")
+            Timber.d("🔍 PatchBot is always available using instant fallback responses")
 
             // Always mark as available since we use fallback responses
             _uiState.value = _uiState.value.copy(isAIAvailable = true)
@@ -39,7 +39,7 @@ class AIAssistantViewModel(
             addMessage(
                 ChatMessage(
                     id = "welcome",
-                    content = """👋 **Welcome to AI Assistant!**
+                    content = """👋 **Welcome to PatchBot!**
 
 I'm your expert guide for model drift detection and monitoring. I can answer any questions instantly!
 
@@ -190,7 +190,7 @@ I'm your expert guide for model drift detection and monitoring. I can answer any
 }
 
 /**
- * UI State for AI Assistant
+ * UI State for PatchBot
  */
 data class AIAssistantUiState(
     val messages: List<ChatMessage> = emptyList(),

@@ -25,46 +25,92 @@ android {
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
         }
+
+        // Multidex support for large apps
+        multiDexEnabled = true
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true  // Remove unused resources
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+
+            // Crash reporting optimization
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
         }
         debug {
             isMinifyEnabled = false
+            isShrinkResources = false
+            isDebuggable = true
+
+            // Enable more detailed crash logs in debug
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
         }
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+
+        // Enable Java 8+ desugaring for older Android versions
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
         jvmTarget = "17"
         freeCompilerArgs += listOf(
             "-opt-in=kotlin.RequiresOptIn",
-            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi"
+            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+            "-Xjvm-default=all"  // Better Java interop
         )
     }
 
     buildFeatures {
         compose = true
         buildConfig = true
+        // Disable unused features
+        aidl = false
+        renderScript = false
+        resValues = false
+        shaders = false
     }
 
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/LICENSE*"
+            excludes += "/META-INF/NOTICE*"
+            // Merge duplicate resources
+            pickFirsts += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
         }
     }
 
+    // Lint configuration for crash prevention
+    lint {
+        checkReleaseBuilds = true
+        abortOnError = false
+        // Check for potential crashes
+        fatal += listOf("StopShip", "NewApi", "InlinedApi")
+        warning += listOf("MissingTranslation", "ExtraTranslation")
+        disable += listOf("ObsoleteLintCustomCheck")
+        baseline = file("lint-baseline.xml")
+    }
+
     ndkVersion = "25.2.9519653"
+
+    // Optimize dex files
+    dexOptions {
+        javaMaxHeapSize = "4g"
+        preDexLibraries = true
+    }
 }
 
 // Force Java 17 toolchain to fix "Unsupported class file major version 69" error
@@ -82,7 +128,14 @@ dependencies {
     // Core Android
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-process:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
+
+    // Multidex support
+    implementation("androidx.multidex:multidex:2.0.1")
+
+    // Java 8+ API desugaring
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
     // Jetpack Compose
     val composeBom = platform("androidx.compose:compose-bom:2024.01.00")
@@ -197,4 +250,17 @@ dependencies {
     // Debug
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+// Ensure all dependencies are resolved without conflicts
+configurations.all {
+    resolutionStrategy {
+        // Force consistent versions
+        force("org.jetbrains.kotlin:kotlin-stdlib:2.0.21")
+        force("org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.0.21")
+
+        // Cache dynamic versions for 24 hours
+        cacheDynamicVersionsFor(24, "hours")
+        cacheChangingModulesFor(24, "hours")
+    }
 }

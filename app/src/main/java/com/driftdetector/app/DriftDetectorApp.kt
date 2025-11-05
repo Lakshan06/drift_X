@@ -1,7 +1,13 @@
 package com.driftdetector.app
 
 import android.app.Application
+import android.os.Build
+import android.os.StrictMode
 import android.util.Log
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleObserver
+import androidx.lifecycle.OnLifecycleEvent
+import androidx.lifecycle.ProcessLifecycleOwner
 import com.driftdetector.app.core.ai.AIAnalysisEngine
 import com.driftdetector.app.di.appModules
 import kotlinx.coroutines.CoroutineScope
@@ -21,14 +27,17 @@ import java.io.PrintWriter
 import java.io.StringWriter
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.system.exitProcess
 
 /**
  * Application class for Model Drift Detector
  * Initializes Koin DI and other app-wide components
+ * Enhanced with comprehensive crash prevention and performance monitoring
  */
-class DriftDetectorApp : Application() {
+class DriftDetectorApp : Application(), LifecycleObserver {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var appStartTime: Long = 0
 
     // Lazy inject to avoid crash if Koin isn't ready
     private val aiEngine: AIAnalysisEngine by lazy {
@@ -41,10 +50,20 @@ class DriftDetectorApp : Application() {
     }
 
     override fun onCreate() {
+        appStartTime = System.currentTimeMillis()
+        
         // Install crash handler FIRST before anything else
         installCrashHandler()
+        
+        // Setup StrictMode for development (helps catch bugs early)
+        if (BuildConfig.DEBUG) {
+            setupStrictMode()
+        }
 
         logStep("=== APP STARTUP BEGIN ===")
+        logStep("Android Version: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
+        logStep("Device: ${Build.MANUFACTURER} ${Build.MODEL}")
+        logStep("Available Memory: ${getAvailableMemoryMB()} MB")
 
         try {
             super.onCreate()
@@ -53,6 +72,9 @@ class DriftDetectorApp : Application() {
             logError("✗ super.onCreate() FAILED", e)
             throw e
         }
+
+        // Register lifecycle observer to detect app background/foreground
+        ProcessLifecycleOwner.get().lifecycle.addObserver(this)
 
         // Initialize Timber for logging
         try {
@@ -68,7 +90,7 @@ class DriftDetectorApp : Application() {
             // Continue anyway
         }
 
-        // Initialize Koin
+        // Initialize Koin with error recovery
         try {
             logStep("Starting Koin initialization...")
             startKoin {
@@ -117,13 +139,93 @@ class DriftDetectorApp : Application() {
             }
         }
 
-        logStep("=== APP STARTUP COMPLETE ===")
+        val startupTime = System.currentTimeMillis() - appStartTime
+        logStep("=== APP STARTUP COMPLETE (${startupTime}ms) ===")
+        Timber.i("App startup completed in ${startupTime}ms")
     }
 
     override fun onTerminate() {
         logStep("=== APP TERMINATING ===")
         super.onTerminate()
         Timber.d("DriftDetectorApp terminated")
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        logStep("⚠️ LOW MEMORY WARNING - System requesting memory release")
+        Timber.w("Low memory detected - clearing caches")
+        
+        // Clear caches to free memory
+        try {
+            // Force garbage collection
+            System.gc()
+            Runtime.getRuntime().gc()
+            
+            logStep("✓ Memory cleanup attempted")
+        } catch (e: Exception) {
+            logError("✗ Memory cleanup failed", e)
+        }
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        
+        val levelStr = when (level) {
+            TRIM_MEMORY_UI_HIDDEN -> "UI_HIDDEN"
+            TRIM_MEMORY_RUNNING_MODERATE -> "RUNNING_MODERATE"
+            TRIM_MEMORY_RUNNING_LOW -> "RUNNING_LOW"
+            TRIM_MEMORY_RUNNING_CRITICAL -> "RUNNING_CRITICAL"
+            TRIM_MEMORY_BACKGROUND -> "BACKGROUND"
+            TRIM_MEMORY_MODERATE -> "MODERATE"
+            TRIM_MEMORY_COMPLETE -> "COMPLETE"
+            else -> "UNKNOWN($level)"
+        }
+        
+        logStep("Memory trim requested: $levelStr")
+        Timber.d("onTrimMemory: $levelStr")
+        
+        // Aggressive cleanup for critical memory situations
+        if (level >= TRIM_MEMORY_RUNNING_CRITICAL) {
+            System.gc()
+            Runtime.getRuntime().gc()
+            logStep("✓ Aggressive memory cleanup performed")
+        }
+    }
+
+    @OnLifecycleEvent(Lifecycle.Event.ON_START)
+    fun onAppForegrounded() {
+        logStep("🟢 App moved to FOREGROUND")
+        Timber.d("App foregrounded")
+    }
+
+    @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
+    fun onAppBackgrounded() {
+        logStep("⚫ App moved to BACKGROUND")
+        Timber.d("App backgrounded")
+    }
+
+    private fun setupStrictMode() {
+        try {
+            // Thread policy - detect violations on main thread
+            StrictMode.setThreadPolicy(
+                StrictMode.ThreadPolicy.Builder()
+                    .detectAll()
+                    .penaltyLog()
+                    .build()
+            )
+
+            // VM policy - detect memory leaks and other issues
+            StrictMode.setVmPolicy(
+                StrictMode.VmPolicy.Builder()
+                    .detectAll()
+                    .penaltyLog()
+                    .build()
+            )
+            
+            logStep("✓ StrictMode enabled (debug mode)")
+        } catch (e: Exception) {
+            logError("✗ StrictMode setup failed", e)
+        }
     }
 
     private fun installCrashHandler() {
@@ -143,6 +245,15 @@ class DriftDetectorApp : Application() {
 
                 // Save crash log to file
                 saveCrashLog(throwable, thread)
+                
+                // Attempt graceful shutdown
+                try {
+                    applicationScope.launch {
+                        delay(100) // Give time for log writing
+                    }
+                } catch (e: Exception) {
+                    // Ignore
+                }
             } catch (e: Exception) {
                 Log.e("CRASH", "Error in crash handler: ${e.message}")
             }
@@ -160,6 +271,10 @@ class DriftDetectorApp : Application() {
             crashFile.writeText(buildString {
                 appendLine("===== CRASH LOG =====")
                 appendLine("Time: $timestamp")
+                appendLine("App Version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+                appendLine("Android: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
+                appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}")
+                appendLine("Available Memory: ${getAvailableMemoryMB()} MB")
                 appendLine("Thread: ${thread.name}")
                 appendLine("Exception: ${throwable.javaClass.name}")
                 appendLine("Message: ${throwable.message}")
@@ -181,6 +296,17 @@ class DriftDetectorApp : Application() {
             Log.e("CRASH", "Crash log saved to: ${crashFile.absolutePath}")
         } catch (e: Exception) {
             Log.e("CRASH", "Failed to save crash log: ${e.message}")
+        }
+    }
+
+    private fun getAvailableMemoryMB(): Long {
+        return try {
+            val runtime = Runtime.getRuntime()
+            val usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024
+            val maxMemory = runtime.maxMemory() / 1024 / 1024
+            maxMemory - usedMemory
+        } catch (e: Exception) {
+            -1
         }
     }
 

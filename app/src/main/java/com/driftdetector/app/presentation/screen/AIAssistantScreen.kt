@@ -25,7 +25,8 @@ import org.koin.androidx.compose.koinViewModel
 import java.time.format.DateTimeFormatter
 
 /**
- * AI Assistant Chat Screen - ChatGPT-like interface
+ * PatchBot Chat Screen - ChatGPT-like interface
+ * Provides natural language Q&A about drift detection and model monitoring
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,7 +78,7 @@ fun AIAssistantScreen(
 
                         Column {
                             Text(
-                                text = "AI Assistant",
+                                text = "PatchBot",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )

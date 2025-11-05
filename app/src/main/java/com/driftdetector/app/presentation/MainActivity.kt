@@ -136,7 +136,7 @@ fun DriftDetectorApp() {
             )
         },
         bottomBar = {
-            // Hide bottom bar on AI Assistant screen
+            // Hide bottom bar on PatchBot screen
             if (currentRoute != Screen.AIAssistant.route) {
                 NavigationBar {
                     val currentDestination = navBackStackEntry?.destination
@@ -163,7 +163,7 @@ fun DriftDetectorApp() {
             }
         },
         floatingActionButton = {
-            // Show FAB on all screens except AI Assistant
+            // Show FAB on all screens except PatchBot
             if (currentRoute != Screen.AIAssistant.route) {
                 FloatingActionButton(
                     onClick = {
@@ -171,7 +171,7 @@ fun DriftDetectorApp() {
                     },
                     containerColor = MaterialTheme.colorScheme.primary
                 ) {
-                    Icon(Icons.Filled.Psychology, contentDescription = "AI Assistant")
+                    Icon(Icons.Filled.Psychology, contentDescription = "PatchBot")
                 }
             }
         }
@@ -225,5 +225,5 @@ sealed class Screen(
     object ModelUpload : Screen("model_upload", "Upload", Icons.Filled.CloudUpload)
     object Patches : Screen("patches", "Patches", Icons.Filled.Build)
     object Settings : Screen("settings", "Settings", Icons.Filled.Settings)
-    object AIAssistant : Screen("ai_assistant", "AI Assistant", Icons.Filled.Psychology)
+    object AIAssistant : Screen("ai_assistant", "PatchBot", Icons.Filled.Psychology)
 }

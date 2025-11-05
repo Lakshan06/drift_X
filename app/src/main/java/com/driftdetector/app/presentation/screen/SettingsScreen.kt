@@ -147,7 +147,7 @@ fun SettingsScreen(
 
         // AI Settings
         item {
-            SettingsSection(title = "AI Assistant") {
+            SettingsSection(title = "PatchBot") {
                 SwitchSettingItem(
                     icon = Icons.Default.SmartToy,
                     title = "AI Explanations",

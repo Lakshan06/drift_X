@@ -130,7 +130,7 @@ class AIAnalysisEngine(private val context: Context) {
             questionLower.matches(Regex("^(hi|hello|hey|hiya|sup|yo|greetings)!*$")) -> {
                 """👋 **Hi there!** 
 
-I'm your AI assistant for drift detection and monitoring. Great to chat with you!
+I'm **PatchBot**, your AI assistant for drift detection and monitoring. Great to chat with you!
 
 **I'm here to help you with:**
 • Understanding model drift and its types
@@ -407,12 +407,14 @@ What can I help you with? 😊"""
             // What's your name
             questionLower.contains("what's your name") || questionLower.contains("whats your name") ||
                     questionLower.contains("your name") || questionLower == "name" -> {
-                """👋 **I'm the DriftGuardAI Assistant!**
+                """👋 **I'm PatchBot!**
 
-You can call me:
-• **Drift Assistant** (my official title)
-• **AI Helper** (casual)
-• **Your Drift Expert** (when I'm feeling fancy 😊)
+That's my name - **PatchBot** - your personal drift detection assistant!
+
+You can also call me:
+• **PatchBot** (my official name! 🤖)
+• **Your Drift Expert** (when I'm feeling professional)
+• **Patch Helper** (casual)
 
 **What I'm all about:**
 I'm your personal guide to understanding and managing model drift in DriftGuardAI!
@@ -1011,7 +1013,7 @@ Safety scores indicate how safe it is to apply a patch to your model.
             
             // General help or unclear questions
             else -> {
-                """**DriftGuardAI Assistant**
+                """**PatchBot - Your Drift Detection Expert**
 
 I'm your AI expert for model drift detection and monitoring!
 

@@ -5,6 +5,9 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import kotlin.math.cos
+import kotlin.math.ln
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
@@ -168,8 +171,15 @@ class DriftDetectorTest {
     ): List<FloatArray> {
         return List(samples) {
             FloatArray(features) {
-                (Random.nextGaussian() * std + mean).toFloat()
+                (nextGaussian() * std + mean).toFloat()
             }
         }
+    }
+
+    // Box-Muller transform to generate normally distributed random numbers
+    private fun nextGaussian(): Double {
+        val u1 = Random.nextDouble()
+        val u2 = Random.nextDouble()
+        return sqrt(-2.0 * ln(u1)) * cos(2.0 * Math.PI * u2)
     }
 }

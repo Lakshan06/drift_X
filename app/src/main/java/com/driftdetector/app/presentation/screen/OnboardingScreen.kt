@@ -37,7 +37,7 @@ fun OnboardingScreen(
         OnboardingPage.Welcome,
         OnboardingPage.DriftDetection,
         OnboardingPage.AutoPatching,
-        OnboardingPage.AIAssistant,
+        OnboardingPage.PatchBot,
         OnboardingPage.GetStarted
     )
 
@@ -310,9 +310,9 @@ sealed class OnboardingPage(
         )
     )
 
-    object AIAssistant : OnboardingPage(
-        title = "AI Assistant",
-        description = "Get instant answers to your drift detection questions. The AI assistant explains concepts, guides you through patches, and shares best practices.",
+    object PatchBot : OnboardingPage(
+        title = "PatchBot",
+        description = "Get instant answers to your drift detection questions. PatchBot explains concepts, guides you through patches, and shares best practices.",
         icon = Icons.Default.Psychology,
         features = listOf(
             "💬 Natural language Q&A",
