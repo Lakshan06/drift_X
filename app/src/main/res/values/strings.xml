@@ -1,0 +1,33 @@
+<resources>
+    <string name="app_name">DriftGuardAI</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Drift Dashboard</string>
+    <string name="no_models">No active models</string>
+    <string name="register_model">Register a model to start monitoring</string>
+
+    <!-- Drift Detection -->
+    <string name="drift_detected">Drift Detected</string>
+    <string name="no_drift">No Drift</string>
+    <string name="drift_score">Drift Score</string>
+
+    <!-- Patches -->
+    <string name="patches_title">Patches</string>
+    <string name="apply_patch">Apply</string>
+    <string name="rollback_patch">Rollback</string>
+    <string name="patch_applied">Patch applied successfully</string>
+    <string name="patch_rolled_back">Patch rolled back successfully</string>
+
+    <!-- Models -->
+    <string name="models_title">Models</string>
+    <string name="add_model">Add Model</string>
+    <string name="deactivate_model">Deactivate</string>
+
+    <!-- Errors -->
+    <string name="error_loading_data">Error loading data</string>
+    <string name="error_network">Network error</string>
+
+    <!-- Notifications -->
+    <string name="notification_drift_title">Drift Detected</string>
+    <string name="notification_drift_desc">Model %1$s has detected drift</string>
+</resources>

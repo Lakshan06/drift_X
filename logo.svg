@@ -1,0 +1,151 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background Circle -->
+    <circle cx="256" cy="256" r="256" fill="url(#bgGradient)" />
+
+    <!-- Gradient Definitions -->
+    <defs>
+        <!-- Background Gradient -->
+        <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+        </linearGradient>
+
+        <!-- Cyan Gradient for D -->
+        <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#00D9FF;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#00A8CC;stop-opacity:1" />
+        </linearGradient>
+
+        <!-- Purple Gradient for G -->
+        <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#9B59B6;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#7B4FD6;stop-opacity:1" />
+        </linearGradient>
+
+        <!-- Glow Effect -->
+        <filter id="glow">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+            <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+            </feMerge>
+        </filter>
+    </defs>
+
+    <!-- Tech Grid Background -->
+    <g opacity="0.1">
+        <line x1="0" y1="128" x2="512" y2="128" stroke="#00D9FF" stroke-width="1" />
+        <line x1="0" y1="256" x2="512" y2="256" stroke="#00D9FF" stroke-width="1" />
+        <line x1="0" y1="384" x2="512" y2="384" stroke="#00D9FF" stroke-width="1" />
+        <line x1="128" y1="0" x2="128" y2="512" stroke="#00D9FF" stroke-width="1" />
+        <line x1="256" y1="0" x2="256" y2="512" stroke="#00D9FF" stroke-width="1" />
+        <line x1="384" y1="0" x2="384" y2="512" stroke="#00D9FF" stroke-width="1" />
+    </g>
+
+    <!-- Data Dots (Neural Network Style) -->
+    <g opacity="0.6">
+        <!-- Top Left Cluster -->
+        <circle cx="100" cy="100" r="3" fill="#00D9FF" />
+        <circle cx="120" cy="90" r="2" fill="#00D9FF" />
+        <circle cx="90" cy="120" r="2" fill="#00D9FF" />
+
+        <!-- Top Right Cluster -->
+        <circle cx="412" cy="100" r="3" fill="#9B59B6" />
+        <circle cx="392" cy="90" r="2" fill="#9B59B6" />
+        <circle cx="422" cy="120" r="2" fill="#9B59B6" />
+
+        <!-- Bottom Left Cluster -->
+        <circle cx="100" cy="412" r="3" fill="#9B59B6" />
+        <circle cx="120" cy="422" r="2" fill="#9B59B6" />
+        <circle cx="90" cy="392" r="2" fill="#9B59B6" />
+
+        <!-- Bottom Right Cluster -->
+        <circle cx="412" cy="412" r="3" fill="#00D9FF" />
+        <circle cx="392" cy="422" r="2" fill="#00D9FF" />
+        <circle cx="422" cy="392" r="2" fill="#00D9FF" />
+
+        <!-- Connecting Lines -->
+        <line x1="100" y1="100" x2="180" y2="180" stroke="#00D9FF" stroke-width="1" opacity="0.3" />
+        <line x1="412" y1="100" x2="332" y2="180" stroke="#9B59B6" stroke-width="1" opacity="0.3" />
+        <line x1="100" y1="412" x2="180" y2="332" stroke="#9B59B6" stroke-width="1" opacity="0.3" />
+        <line x1="412" y1="412" x2="332" y2="332" stroke="#00D9FF" stroke-width="1" opacity="0.3" />
+    </g>
+
+    <!-- Main Logo Group -->
+    <g filter="url(#glow)">
+
+        <!-- Letter "D" - Cyan - Left Side -->
+        <g>
+            <!-- D Vertical Bar -->
+            <rect x="140" y="140" width="45" height="180" rx="8" fill="url(#cyanGrad)" />
+
+            <!-- D Curve (Right Side) -->
+            <path d="M 185 140 L 240 140 Q 280 140 280 180 L 280 280 Q 280 320 240 320 L 185 320 Z"
+                fill="url(#cyanGrad)" />
+
+            <!-- Inner Cut for D -->
+            <path d="M 185 175 L 220 175 Q 245 175 245 200 L 245 260 Q 245 285 220 285 L 185 285 Z"
+                fill="#1a1a2e" />
+        </g>
+
+        <!-- Letter "G" - Purple - Right Side overlapping -->
+        <g>
+            <!-- G Outer Circle -->
+            <circle cx="300" cy="230" r="90" fill="url(#purpleGrad)" />
+
+            <!-- G Inner Cut (making it hollow) -->
+            <circle cx="300" cy="230" r="55" fill="#1a1a2e" />
+
+            <!-- G Opening (right side cut) -->
+            <rect x="300" y="195" width="95" height="70" fill="#1a1a2e" />
+
+            <!-- G Horizontal Bar (right side) -->
+            <rect x="280" y="220" width="65" height="35" rx="8" fill="url(#purpleGrad)" />
+        </g>
+
+        <!-- Tech Accent Lines -->
+        <g opacity="0.8">
+            <!-- Corner Brackets (Tech Style) -->
+            <path d="M 120 120 L 120 100 L 140 100" stroke="#00D9FF" stroke-width="3" fill="none"
+                stroke-linecap="round" />
+            <path d="M 392 120 L 392 100 L 372 100" stroke="#9B59B6" stroke-width="3" fill="none"
+                stroke-linecap="round" />
+            <path d="M 120 340 L 120 360 L 140 360" stroke="#9B59B6" stroke-width="3" fill="none"
+                stroke-linecap="round" />
+            <path d="M 392 340 L 392 360 L 372 360" stroke="#00D9FF" stroke-width="3" fill="none"
+                stroke-linecap="round" />
+        </g>
+    </g>
+
+    <!-- App Name Text -->
+    <g>
+        <!-- DriftGuardAI Text with modern font -->
+        <text x="256" y="395" font-family="Arial, sans-serif" font-size="38" font-weight="700"
+            text-anchor="middle" fill="#FFFFFF" letter-spacing="2">
+            DriftGuard
+            <tspan fill="#00D9FF">AI</tspan>
+        </text>
+
+        <!-- Subtitle/Tagline -->
+        <text x="256" y="425" font-family="Arial, sans-serif" font-size="16" font-weight="400"
+            text-anchor="middle" fill="#A0A0A0" letter-spacing="4">
+            ML DRIFT MONITOR
+        </text>
+
+        <!-- Tech Underline -->
+        <line x1="180" y1="400" x2="210" y2="400" stroke="#00D9FF" stroke-width="2"
+            stroke-linecap="round" />
+        <line x1="302" y1="400" x2="332" y2="400" stroke="#9B59B6" stroke-width="2"
+            stroke-linecap="round" />
+    </g>
+
+    <!-- Version Badge (Optional) -->
+    <g transform="translate(380, 60)">
+        <rect x="0" y="0" width="60" height="24" rx="12" fill="#00D9FF" opacity="0.2" />
+        <text x="30" y="16" font-family="Arial, sans-serif" font-size="11" font-weight="600"
+            text-anchor="middle" fill="#00D9FF">
+            v1.0
+        </text>
+    </g>
+
+</svg>
