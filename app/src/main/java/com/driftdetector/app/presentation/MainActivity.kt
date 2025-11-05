@@ -20,6 +20,7 @@ import androidx.navigation.compose.rememberNavController
 import com.driftdetector.app.presentation.screen.AIAssistantScreen
 import com.driftdetector.app.presentation.screen.DriftDashboardScreen
 import com.driftdetector.app.presentation.screen.ModelManagementScreen
+import com.driftdetector.app.presentation.screen.ModelUploadScreen
 import com.driftdetector.app.presentation.screen.PatchManagementScreen
 import com.driftdetector.app.presentation.screen.SettingsScreen
 import com.driftdetector.app.presentation.screen.ThemeMode
@@ -27,10 +28,14 @@ import com.driftdetector.app.presentation.theme.DriftDetectorTheme
 import com.driftdetector.app.presentation.viewmodel.SettingsViewModel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import com.driftdetector.app.core.monitoring.ModelMonitoringService
+import org.koin.android.ext.android.inject
 import org.koin.androidx.compose.koinViewModel
 import timber.log.Timber
 
 class MainActivity : ComponentActivity() {
+    private val monitoringService: ModelMonitoringService by inject()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         Log.d("ACTIVITY", "=== MainActivity.onCreate() START ===")
         Timber.d("MainActivity onCreate called")
@@ -38,6 +43,10 @@ class MainActivity : ComponentActivity() {
         try {
             super.onCreate(savedInstanceState)
             Log.d("ACTIVITY", "✓ super.onCreate() completed")
+
+            // Start continuous model monitoring
+            monitoringService.startMonitoring()
+            Log.d("ACTIVITY", "✓ Monitoring service started")
 
             setContent {
                 Log.d("ACTIVITY", "✓ setContent block entered")
@@ -97,7 +106,8 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         Log.d("ACTIVITY", "MainActivity.onDestroy()")
-        Timber.d("MainActivity onDestroy")
+        monitoringService.shutdown()
+        Timber.d("MainActivity onDestroy - monitoring service shutdown")
     }
 }
 
@@ -175,7 +185,18 @@ fun DriftDetectorApp() {
                 DriftDashboardScreen()
             }
             composable(Screen.Models.route) {
-                ModelManagementScreen()
+                ModelManagementScreen(
+                    onNavigateToUpload = {
+                        navController.navigate(Screen.ModelUpload.route)
+                    }
+                )
+            }
+            composable(Screen.ModelUpload.route) {
+                ModelUploadScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
             }
             composable(Screen.Patches.route) {
                 PatchManagementScreen()
@@ -201,6 +222,7 @@ sealed class Screen(
 ) {
     object Dashboard : Screen("dashboard", "Dashboard", Icons.Filled.Dashboard)
     object Models : Screen("models", "Models", Icons.Filled.Memory)
+    object ModelUpload : Screen("model_upload", "Upload", Icons.Filled.CloudUpload)
     object Patches : Screen("patches", "Patches", Icons.Filled.Build)
     object Settings : Screen("settings", "Settings", Icons.Filled.Settings)
     object AIAssistant : Screen("ai_assistant", "AI Assistant", Icons.Filled.Psychology)

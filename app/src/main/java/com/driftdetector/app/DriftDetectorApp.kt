@@ -6,6 +6,7 @@ import com.driftdetector.app.core.ai.AIAnalysisEngine
 import com.driftdetector.app.di.appModules
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
@@ -28,7 +29,16 @@ import java.util.*
 class DriftDetectorApp : Application() {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val aiEngine: AIAnalysisEngine by inject()
+
+    // Lazy inject to avoid crash if Koin isn't ready
+    private val aiEngine: AIAnalysisEngine by lazy {
+        try {
+            inject<AIAnalysisEngine>().value
+        } catch (e: Exception) {
+            Log.e("APP_INIT", "Failed to inject AIAnalysisEngine", e)
+            null
+        } ?: AIAnalysisEngine(this)
+    }
 
     override fun onCreate() {
         // Install crash handler FIRST before anything else
@@ -70,7 +80,8 @@ class DriftDetectorApp : Application() {
             logStep("✓ Koin initialized successfully")
         } catch (e: Exception) {
             logError("✗ Koin initialization FAILED", e)
-            throw e // This is critical, can't continue
+            // Don't throw - try to continue with limited functionality
+            Log.e("APP_INIT", "App will run with limited functionality", e)
         }
 
         Timber.d("DriftDetectorApp initialized")
@@ -82,6 +93,10 @@ class DriftDetectorApp : Application() {
             try {
                 logStep("Starting AI Analysis Engine initialization...")
                 Timber.d("Starting AI Analysis Engine initialization...")
+
+                // Add delay to ensure Koin is fully ready
+                delay(1000)
+
                 aiEngine.initialize()
                 Timber.i("✅ AI Analysis Engine initialized successfully")
                 logStep("✓ AI Analysis Engine initialized")

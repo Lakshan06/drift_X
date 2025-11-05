@@ -1,6 +1,9 @@
 <resources>
     <string name="app_name">DriftGuardAI</string>
 
+    <!-- SciChart License Key (for development, can be empty) -->
+    <string name="sciChart_license"></string>
+
     <!-- Dashboard -->
     <string name="dashboard_title">Drift Dashboard</string>
     <string name="no_models">No active models</string>

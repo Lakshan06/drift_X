@@ -7,10 +7,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.driftdetector.app.domain.model.MLModel
 import com.driftdetector.app.presentation.viewmodel.ModelManagementState
@@ -21,7 +23,8 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 fun ModelManagementScreen(
-    viewModel: ModelManagementViewModel = koinViewModel()
+    viewModel: ModelManagementViewModel = koinViewModel(),
+    onNavigateToUpload: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
@@ -29,12 +32,14 @@ fun ModelManagementScreen(
     when (val state = uiState) {
         is ModelManagementState.Loading -> LoadingScreen()
         is ModelManagementState.Empty -> EmptyModelsScreen(
-            onAddClick = { showAddDialog = true }
+            onAddClick = { showAddDialog = true },
+            onUploadClick = onNavigateToUpload
         )
         is ModelManagementState.Success -> ModelListContent(
             models = state.models,
             onDeactivate = { viewModel.deactivateModel(it) },
-            onAddClick = { showAddDialog = true }
+            onAddClick = { showAddDialog = true },
+            onUploadClick = onNavigateToUpload
         )
         is ModelManagementState.Error -> ErrorScreen(state.message)
     }
@@ -55,7 +60,8 @@ fun ModelManagementScreen(
 fun ModelListContent(
     models: List<MLModel>,
     onDeactivate: (String) -> Unit,
-    onAddClick: () -> Unit
+    onAddClick: () -> Unit,
+    onUploadClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -72,10 +78,24 @@ fun ModelListContent(
                 style = MaterialTheme.typography.titleLarge
             )
 
-            FloatingActionButton(
-                onClick = onAddClick
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Model")
+                // Upload button
+                FloatingActionButton(
+                    onClick = onUploadClick,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                ) {
+                    Icon(Icons.Default.CloudUpload, contentDescription = "Upload Model")
+                }
+
+                // Register button
+                FloatingActionButton(
+                    onClick = onAddClick
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Register Model")
+                }
             }
         }
 
@@ -309,7 +329,10 @@ fun InfoRow(label: String, value: String) {
 }
 
 @Composable
-fun EmptyModelsScreen(onAddClick: () -> Unit) {
+fun EmptyModelsScreen(
+    onAddClick: () -> Unit,
+    onUploadClick: () -> Unit
+) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -319,7 +342,7 @@ fun EmptyModelsScreen(onAddClick: () -> Unit) {
             modifier = Modifier.padding(32.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.Add,
+                imageVector = Icons.Default.CloudUpload,
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
                 tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
@@ -331,15 +354,33 @@ fun EmptyModelsScreen(onAddClick: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "Add a model to start monitoring",
+                "Upload a model file or register an existing one to start monitoring",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = onAddClick) {
+
+            // Upload button (primary action)
+            Button(
+                onClick = onUploadClick,
+                modifier = Modifier.fillMaxWidth(0.8f)
+            ) {
+                Icon(Icons.Default.CloudUpload, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Upload Model & Data")
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Register button (secondary action)
+            OutlinedButton(
+                onClick = onAddClick,
+                modifier = Modifier.fillMaxWidth(0.8f)
+            ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Register Model")
+                Text("Register Existing Model")
             }
         }
     }

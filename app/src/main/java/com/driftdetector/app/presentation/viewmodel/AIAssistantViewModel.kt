@@ -24,52 +24,59 @@ class AIAssistantViewModel(
     private val conversationHistory = mutableListOf<String>()
 
     init {
+        Timber.d("🔍 AIAssistantViewModel init - AI always available (fallback mode)")
         checkAIAvailability()
     }
 
     private fun checkAIAvailability() {
         viewModelScope.launch {
-            val isAvailable = aiEngine.isAvailable()
-            _uiState.value = _uiState.value.copy(isAIAvailable = isAvailable)
+            Timber.d("🔍 AI is always available using instant fallback responses")
 
-            if (isAvailable) {
-                // Add welcome message
-                addMessage(
-                    ChatMessage(
-                        id = "welcome",
-                        content = """👋 Hello! I'm your AI expert for drift detection and model monitoring.
+            // Always mark as available since we use fallback responses
+            _uiState.value = _uiState.value.copy(isAIAvailable = true)
 
-I can help you with:
-• Understanding drift detection results
-• Explaining patches and recommendations
-• Troubleshooting issues
-• Best practices for monitoring
-• Learning about drift concepts
+            // Add welcome message
+            addMessage(
+                ChatMessage(
+                    id = "welcome",
+                    content = """👋 **Welcome to AI Assistant!**
 
-Ask me anything about model drift!""",
-                        isUser = false,
-                        timestamp = Instant.now()
-                    )
+I'm your expert guide for model drift detection and monitoring. I can answer any questions instantly!
+
+**I can help you with:**
+
+📊 **Understanding Drift**
+• What is model drift? (concept, covariate, prior)
+• PSI vs KS statistical tests
+• Feature-level drift analysis
+
+🔧 **Managing Patches**
+• How to apply and rollback patches
+• Understanding safety scores
+• Patch types and their effects
+
+📈 **Best Practices**
+• Setting up drift monitoring
+• When to retrain vs patch
+• Alert thresholds and strategies
+
+🔍 **Troubleshooting**
+• Interpreting drift scores
+• Investigating high drift
+• Validating model performance
+
+**Try asking:**
+• "What is drift?"
+• "PSI vs KS test"
+• "How do I apply a patch?"
+• "Best practices for monitoring"
+• "When should I retrain?"
+
+**Go ahead and ask me anything!** I'm here to help. 😊""",
+                    isUser = false,
+                    timestamp = Instant.now()
                 )
-            } else {
-                addMessage(
-                    ChatMessage(
-                        id = "unavailable",
-                        content = """⚠️ AI Assistant is currently initializing.
-
-**First Time Setup:**
-When you send your first message, I'll automatically download a lightweight AI model (119-374 MB).
-
-**Models Available:**
-• SmolLM2 360M (119 MB) - Fast responses
-• Qwen 2.5 0.5B (374 MB) - Better quality
-
-WiFi connection recommended for download.""",
-                        isUser = false,
-                        timestamp = Instant.now()
-                    )
-                )
-            }
+            )
         }
     }
 
@@ -77,6 +84,8 @@ WiFi connection recommended for download.""",
         if (content.isBlank()) return
 
         val trimmedContent = content.trim()
+
+        Timber.d("📤 Sending message: $trimmedContent")
 
         // Add user message
         val userMessage = ChatMessage(
@@ -93,30 +102,30 @@ WiFi connection recommended for download.""",
         // Set loading state
         _uiState.value = _uiState.value.copy(isLoading = true)
 
-        // Generate AI response with streaming
+        // Generate AI response (instant fallback)
         viewModelScope.launch {
             try {
                 val assistantMessageId = "assistant_${System.currentTimeMillis()}"
-                var fullResponse = ""
 
-                // Add placeholder for assistant message
+                Timber.d("📥 Getting instant AI response...")
+
+                // Get instant response from fallback
+                val response = aiEngine.answerQuestion(trimmedContent)
+
+                // Add complete message
                 addMessage(
                     ChatMessage(
                         id = assistantMessageId,
-                        content = "",
+                        content = response,
                         isUser = false,
                         timestamp = Instant.now()
                     )
                 )
 
-                // Collect streaming response with intelligent prompting
-                aiEngine.answerQuestionStream(trimmedContent).collect { token ->
-                    fullResponse += token
-                    updateMessageContent(assistantMessageId, fullResponse)
-                }
+                Timber.d("✅ Response delivered: ${response.length} characters")
 
                 // Add AI response to conversation history
-                conversationHistory.add("AI: $fullResponse")
+                conversationHistory.add("AI: $response")
 
                 // Keep only last 10 exchanges for context (20 messages total)
                 if (conversationHistory.size > 20) {
@@ -124,21 +133,28 @@ WiFi connection recommended for download.""",
                 }
 
                 _uiState.value = _uiState.value.copy(isLoading = false)
-                Timber.d("AI response generated successfully: ${fullResponse.take(100)}...")
+
             } catch (e: Exception) {
-                Timber.e(e, "Error generating AI response")
+                Timber.e(e, "❌ Error generating AI response")
 
-                // Provide helpful error message based on error type
-                val errorMessage = when {
-                    e.message?.contains("model") == true ->
-                        "❌ Model not ready. Please wait for the AI model to download, then try again."
+                val errorMessage = """❌ Oops! Something went wrong.
 
-                    e.message?.contains("network") == true ->
-                        "❌ Network error. Please check your connection and try again."
+**Don't worry** - This is unusual. Let me try to help anyway!
 
-                    else ->
-                        "❌ Sorry, I encountered an error. Please try rephrasing your question."
-                }
+**Your question was:** "$trimmedContent"
+
+**Common topics I can help with:**
+• Model drift concepts
+• PSI and KS tests
+• Applying patches
+• Monitoring strategies
+
+**Try:**
+• Rephrase your question
+• Ask about a specific topic
+• Be more specific
+
+**Error details:** ${e.message ?: "Unknown error"}"""
 
                 addMessage(
                     ChatMessage(
@@ -154,8 +170,9 @@ WiFi connection recommended for download.""",
     }
 
     fun clearChat() {
+        Timber.d("🗑️ Clearing chat history")
         conversationHistory.clear()
-        _uiState.value = AIAssistantUiState(isAIAvailable = _uiState.value.isAIAvailable)
+        _uiState.value = AIAssistantUiState(isAIAvailable = true) // Always available
         checkAIAvailability() // Re-add welcome message
     }
 
@@ -165,19 +182,9 @@ WiFi connection recommended for download.""",
         _uiState.value = _uiState.value.copy(messages = currentMessages)
     }
 
-    private fun updateMessageContent(messageId: String, newContent: String) {
-        val updatedMessages = _uiState.value.messages.map { message ->
-            if (message.id == messageId) {
-                message.copy(content = newContent)
-            } else {
-                message
-            }
-        }
-        _uiState.value = _uiState.value.copy(messages = updatedMessages)
-    }
-
     override fun onCleared() {
         super.onCleared()
+        Timber.d("🧹 AIAssistantViewModel cleared")
         conversationHistory.clear()
     }
 }

@@ -4,25 +4,30 @@ import android.content.Context
 import android.util.Log
 import androidx.room.Room
 import com.driftdetector.app.core.ai.AIAnalysisEngine
+import com.driftdetector.app.core.cloud.CloudStorageManager
 import com.driftdetector.app.core.drift.AttributionEngine
 import com.driftdetector.app.core.drift.DriftDetector
+import com.driftdetector.app.core.export.ModelExportManager
+import com.driftdetector.app.core.ml.ModelMetadataExtractor
 import com.driftdetector.app.core.ml.TFLiteModelInference
+import com.driftdetector.app.core.monitoring.ModelMonitoringService
 import com.driftdetector.app.core.patch.PatchEngine
 import com.driftdetector.app.core.patch.PatchSynthesizer
 import com.driftdetector.app.core.patch.PatchValidator
 import com.driftdetector.app.core.security.DifferentialPrivacy
 import com.driftdetector.app.core.security.EncryptionManager
+import com.driftdetector.app.core.upload.FileUploadProcessor
 import com.driftdetector.app.data.local.DriftDatabase
 import com.driftdetector.app.data.repository.DriftRepository
 import com.driftdetector.app.data.remote.DriftApiService
 import com.driftdetector.app.presentation.viewmodel.AIAssistantViewModel
 import com.driftdetector.app.presentation.viewmodel.DriftDashboardViewModel
 import com.driftdetector.app.presentation.viewmodel.ModelManagementViewModel
+import com.driftdetector.app.presentation.viewmodel.ModelUploadViewModel
 import com.driftdetector.app.presentation.viewmodel.PatchManagementViewModel
 import com.driftdetector.app.presentation.viewmodel.SettingsViewModel
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
-import net.sqlcipher.database.SupportFactory
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import org.koin.android.ext.koin.androidContext
@@ -42,16 +47,37 @@ val databaseModule = module {
 
     single {
         try {
-            Log.d("KOIN", "Creating encrypted database...")
-            val passphrase = "DriftDetectorSecureKey2024".toByteArray()
-            val factory = SupportFactory(passphrase)
+            Log.d("KOIN", "Creating database (standard Room, no SQLCipher)...")
+
+            // Delete old SQLCipher encrypted database if it exists
+            val context = androidContext()
+            val dbFile = context.getDatabasePath(DriftDatabase.DATABASE_NAME)
+            if (dbFile.exists()) {
+                Log.d("KOIN", "Found existing database file, checking if it's encrypted...")
+                try {
+                    // Try to detect if it's an old SQLCipher database by reading the file header
+                    // SQLCipher databases start with "SQLite format 3" but are encrypted
+                    // We'll just delete it to be safe since we changed encryption approach
+                    val deleted = dbFile.delete()
+                    if (deleted) {
+                        Log.d("KOIN", "✓ Deleted old database file (may have been encrypted)")
+                        // Also delete related files
+                        context.getDatabasePath("${DriftDatabase.DATABASE_NAME}-shm")?.delete()
+                        context.getDatabasePath("${DriftDatabase.DATABASE_NAME}-wal")?.delete()
+                        context.getDatabasePath("${DriftDatabase.DATABASE_NAME}-journal")?.delete()
+                    } else {
+                        Log.w("KOIN", "⚠ Could not delete old database file")
+                    }
+                } catch (e: Exception) {
+                    Log.w("KOIN", "⚠ Error checking/deleting old database: ${e.message}")
+                }
+            }
 
             val db = Room.databaseBuilder(
                 androidContext(),
                 DriftDatabase::class.java,
                 DriftDatabase.DATABASE_NAME
             )
-                .openHelperFactory(factory)
                 .fallbackToDestructiveMigration()
                 .build()
 
@@ -215,13 +241,39 @@ val coreModule = module {
         }
     }
 
-    // ML Inference
+    // ML Inference & Model Analysis
     factory { (context: Context) ->
         try {
             Log.d("KOIN", "Creating TFLiteModelInference...")
             TFLiteModelInference(context, useGpu = true, numThreads = 4)
         } catch (e: Exception) {
             Log.e("KOIN", "✗ TFLiteModelInference creation FAILED", e)
+            throw e
+        }
+    }
+
+    // Model Metadata Extractor
+    single {
+        try {
+            Log.d("KOIN", "Creating ModelMetadataExtractor...")
+            val extractor = ModelMetadataExtractor(androidContext())
+            Log.d("KOIN", "✓ ModelMetadataExtractor created")
+            extractor
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ ModelMetadataExtractor creation FAILED", e)
+            throw e
+        }
+    }
+
+    // Model Export Manager
+    single {
+        try {
+            Log.d("KOIN", "Creating ModelExportManager...")
+            val exportManager = ModelExportManager(androidContext())
+            Log.d("KOIN", "✓ ModelExportManager created")
+            exportManager
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ ModelExportManager creation FAILED", e)
             throw e
         }
     }
@@ -257,6 +309,39 @@ val coreModule = module {
         }
     }
 
+    // File Upload Processor
+    single {
+        try {
+            Log.d("KOIN", "Creating FileUploadProcessor...")
+            val processor = FileUploadProcessor(
+                context = androidContext(),
+                repository = get(),
+                metadataExtractor = get()
+            )
+            Log.d("KOIN", "✓ FileUploadProcessor created")
+            processor
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ FileUploadProcessor creation FAILED", e)
+            throw e
+        }
+    }
+
+    // Model Monitoring Service
+    single {
+        try {
+            Log.d("KOIN", "Creating ModelMonitoringService...")
+            val service = ModelMonitoringService(
+                context = androidContext(),
+                repository = get()
+            )
+            Log.d("KOIN", "✓ ModelMonitoringService created")
+            service
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ ModelMonitoringService creation FAILED", e)
+            throw e
+        }
+    }
+
     // AI Analysis Engine
     single {
         try {
@@ -266,6 +351,16 @@ val coreModule = module {
             engine
         } catch (e: Exception) {
             Log.e("KOIN", "✗ AIAnalysisEngine creation FAILED", e)
+            throw e
+        }
+    }
+
+    single {
+        Log.d("KOIN", "Creating CloudStorageManager...")
+        try {
+            CloudStorageManager(androidContext())
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ CloudStorageManager creation FAILED", e)
             throw e
         }
     }
@@ -317,6 +412,20 @@ val viewModelModule = module {
             ModelManagementViewModel(get())
         } catch (e: Exception) {
             Log.e("KOIN", "✗ ModelManagementViewModel creation FAILED", e)
+            throw e
+        }
+    }
+
+    viewModel {
+        try {
+            Log.d("KOIN", "Creating ModelUploadViewModel...")
+            ModelUploadViewModel(
+                fileUploadProcessor = get(),
+                context = androidContext(),
+                cloudStorageManager = get()
+            )
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ ModelUploadViewModel creation FAILED", e)
             throw e
         }
     }

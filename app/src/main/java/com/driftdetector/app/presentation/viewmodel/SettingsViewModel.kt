@@ -1,12 +1,17 @@
 package com.driftdetector.app.presentation.viewmodel
 
 import android.content.Context
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.driftdetector.app.core.export.ModelExportManager
+import com.driftdetector.app.core.export.PredictionResult
 import com.driftdetector.app.data.repository.DriftRepository
 import com.driftdetector.app.presentation.screen.ThemeMode
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 import timber.log.Timber
 import java.io.File
 import java.time.Instant
@@ -18,7 +23,9 @@ import java.time.temporal.ChronoUnit
 class SettingsViewModel(
     private val repository: DriftRepository,
     private val context: Context
-) : ViewModel() {
+) : ViewModel(), KoinComponent {
+
+    private val exportManager: ModelExportManager by inject()
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -175,13 +182,196 @@ class SettingsViewModel(
     }
 
     fun exportData() {
-        // TODO: Implement data export
-        Timber.d("Exporting data")
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isExporting = true, exportError = null) }
+                Timber.d("📤 Starting data export...")
+
+                // Get all active models
+                val models = repository.getActiveModels().first()
+
+                if (models.isEmpty()) {
+                    Timber.w("⚠️ No models found to export")
+                    _uiState.update {
+                        it.copy(
+                            isExporting = false,
+                            exportError = "No models found. Please upload a model first."
+                        )
+                    }
+                    return@launch
+                }
+
+                val exportedFiles = mutableListOf<String>()
+
+                models.forEach { model ->
+                    try {
+                        Timber.d("📊 Exporting data for model: ${model.name}")
+
+                        // Get drift results
+                        val driftResults = repository.getDriftResultsByModel(model.id).first()
+
+                        // Get patches
+                        val patches = repository.getPatchesByModel(model.id).first()
+
+                        // Get recent predictions (last 7 days)
+                        val startTime = Instant.now().minus(7, ChronoUnit.DAYS)
+                        val predictions =
+                            repository.getRecentPredictions(model.id, startTime).first()
+
+                        // Export drift report (JSON)
+                        if (driftResults.isNotEmpty()) {
+                            val driftReportResult = exportManager.exportDriftReport(
+                                model = model,
+                                driftResults = driftResults,
+                                patches = patches
+                            )
+
+                            driftReportResult.onSuccess { exportResult ->
+                                Timber.i("✅ Exported drift report: ${exportResult.fileName}")
+                                exportedFiles.add(exportResult.fileName)
+                            }
+                        }
+
+                        // Export predictions (CSV)
+                        if (predictions.isNotEmpty()) {
+                            val predictionResults = predictions.map { pred ->
+                                PredictionResult(
+                                    timestamp = pred.timestamp,
+                                    input = pred.input.features,
+                                    prediction = pred.outputs,
+                                    confidence = pred.confidence,
+                                    modelVersion = model.version,
+                                    patchId = null, // TODO: Track patch ID with predictions
+                                    driftScore = null // TODO: Track drift score with predictions
+                                )
+                            }
+
+                            val predictionsResult = exportManager.exportPredictionsToCsv(
+                                modelName = model.name,
+                                predictions = predictionResults,
+                                includeMetadata = true
+                            )
+
+                            predictionsResult.onSuccess { exportResult ->
+                                Timber.i("✅ Exported predictions: ${exportResult.fileName}")
+                                exportedFiles.add(exportResult.fileName)
+                            }
+                        }
+
+                    } catch (e: Exception) {
+                        Timber.e(e, "❌ Failed to export data for model: ${model.name}")
+                    }
+                }
+
+                if (exportedFiles.isEmpty()) {
+                    Timber.w("⚠️ No data available to export")
+                    _uiState.update {
+                        it.copy(
+                            isExporting = false,
+                            exportError = "No data available to export. Models need to have predictions or drift results."
+                        )
+                    }
+                } else {
+                    Timber.i("✅ Export complete! Files: ${exportedFiles.joinToString(", ")}")
+                    _uiState.update {
+                        it.copy(
+                            isExporting = false,
+                            exportSuccess = true,
+                            lastExportedFiles = exportedFiles
+                        )
+                    }
+
+                    // Show export location
+                    val exportDir = context.getExternalFilesDir(null)?.absolutePath
+                    Timber.i("📁 Exported files location: $exportDir")
+                }
+
+            } catch (e: Exception) {
+                Timber.e(e, "❌ Export failed")
+                _uiState.update {
+                    it.copy(
+                        isExporting = false,
+                        exportError = "Export failed: ${e.message}"
+                    )
+                }
+            }
+        }
     }
 
-    fun openPrivacyPolicy() {
-        // TODO: Open privacy policy
-        Timber.d("Opening privacy policy")
+    fun clearExportStatus() {
+        _uiState.update {
+            it.copy(
+                exportSuccess = false,
+                exportError = null,
+                lastExportedFiles = emptyList()
+            )
+        }
+    }
+
+    fun shareLastExport() {
+        viewModelScope.launch {
+            try {
+                val exportDir = context.getExternalFilesDir(null)
+                val files = exportDir?.listFiles()?.filter { file ->
+                    file.name.startsWith("predictions_") ||
+                            file.name.startsWith("drift_report_") ||
+                            file.name.startsWith("patch_comparison_")
+                }?.sortedByDescending { it.lastModified() }
+
+                if (files.isNullOrEmpty()) {
+                    Timber.w("⚠️ No export files found")
+                    return@launch
+                }
+
+                // Share the most recent export
+                val latestFile = files.first()
+                val uri = androidx.core.content.FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    latestFile
+                )
+
+                val mimeType = when {
+                    latestFile.name.endsWith(".csv") -> "text/csv"
+                    latestFile.name.endsWith(".json") -> "application/json"
+                    else -> "*/*"
+                }
+
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = mimeType
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_SUBJECT, "DriftGuard AI Export - ${latestFile.name}")
+                    putExtra(Intent.EXTRA_TEXT, "Exported data from DriftGuard AI")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+
+                context.startActivity(Intent.createChooser(shareIntent, "Share Export"))
+                Timber.i("📤 Sharing export: ${latestFile.name}")
+
+            } catch (e: Exception) {
+                Timber.e(e, "❌ Failed to share export")
+            }
+        }
+    }
+
+    fun openExportLocation() {
+        try {
+            val exportDir = context.getExternalFilesDir(null)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(
+                    androidx.core.content.FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        exportDir!!
+                    ),
+                    "resource/folder"
+                )
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(intent, "Open Export Folder"))
+        } catch (e: Exception) {
+            Timber.e(e, "❌ Failed to open export location")
+        }
     }
 
     private fun calculateStorageUsed() {
@@ -231,6 +421,12 @@ data class SettingsUiState(
 
     // Data Management
     val dataRetentionDays: Int = 30,
+
+    // Export State
+    val isExporting: Boolean = false,
+    val exportSuccess: Boolean = false,
+    val exportError: String? = null,
+    val lastExportedFiles: List<String> = emptyList(),
 
     // About
     val appVersion: String = "1.0.0",

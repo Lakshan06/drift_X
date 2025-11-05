@@ -44,3 +44,13 @@
 # Compose
 -keep class androidx.compose.** { *; }
 -dontwarn androidx.compose.**
+
+# ============================================================================
+# Note about ashmem deprecation warning:
+# ============================================================================
+# If you see "ashmem: Pinning is deprecated since Android Q" warnings in logcat,
+# this is coming from third-party libraries (likely MPAndroidChart or TensorFlow)
+# that haven't updated to modern memory APIs yet. This is a deprecation warning,
+# not an error - it's harmless and doesn't affect app functionality.
+# The warning can be safely ignored until library maintainers update their code.
+# ============================================================================

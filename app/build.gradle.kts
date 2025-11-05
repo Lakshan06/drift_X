@@ -111,7 +111,11 @@ dependencies {
 
     // Security & Encryption
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
-    implementation("net.zetetic:android-database-sqlcipher:4.5.4")
+    // SQLCipher removed - using standard Room to avoid deprecated Android Q ashmem API
+    implementation("androidx.sqlite:sqlite-ktx:2.4.0")
+
+    // CSV Parsing (for data uploads)
+    implementation("com.opencsv:opencsv:5.9")
 
     // TensorFlow Lite
     implementation("org.tensorflow:tensorflow-lite:2.14.0")

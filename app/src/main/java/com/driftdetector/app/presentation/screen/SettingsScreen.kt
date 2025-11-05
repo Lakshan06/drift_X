@@ -19,6 +19,26 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    // Show export status dialog
+    if (uiState.isExporting) {
+        ExportProgressDialog()
+    }
+
+    if (uiState.exportSuccess) {
+        ExportSuccessDialog(
+            exportedFiles = uiState.lastExportedFiles,
+            onDismiss = { viewModel.clearExportStatus() },
+            onShare = { viewModel.shareLastExport() }
+        )
+    }
+
+    if (uiState.exportError != null) {
+        ExportErrorDialog(
+            error = uiState.exportError!!,
+            onDismiss = { viewModel.clearExportStatus() }
+        )
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -194,7 +214,7 @@ fun SettingsScreen(
                     icon = Icons.Default.PrivacyTip,
                     title = "Privacy Policy",
                     subtitle = "View privacy policy",
-                    onClick = { viewModel.openPrivacyPolicy() }
+                    onClick = { /* TODO: Open privacy policy */ }
                 )
             }
         }
@@ -415,4 +435,124 @@ enum class ThemeMode(val displayName: String) {
     LIGHT("Light"),
     DARK("Dark"),
     AUTO("Auto")
+}
+
+@Composable
+fun ExportProgressDialog() {
+    AlertDialog(
+        onDismissRequest = { },
+        title = { Text("Exporting Data") },
+        text = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.padding(16.dp)
+                )
+                Text(
+                    "Please wait while your data is being exported...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        },
+        confirmButton = { }
+    )
+}
+
+@Composable
+fun ExportSuccessDialog(
+    exportedFiles: List<String>,
+    onDismiss: () -> Unit,
+    onShare: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(48.dp)
+            )
+        },
+        title = { Text("Export Successful!") },
+        text = {
+            Column {
+                Text(
+                    "Successfully exported ${exportedFiles.size} file(s):",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                exportedFiles.forEach { fileName ->
+                    Text(
+                        "• $fileName",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Files are saved in app storage and can be shared.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onShare) {
+                Icon(
+                    imageVector = Icons.Default.Share,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Share")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}
+
+@Composable
+fun ExportErrorDialog(
+    error: String,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Error,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(48.dp)
+            )
+        },
+        title = { Text("Export Failed") },
+        text = {
+            Column {
+                Text(
+                    "An error occurred while exporting your data:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Text(
+                    error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("OK")
+            }
+        }
+    )
 }
