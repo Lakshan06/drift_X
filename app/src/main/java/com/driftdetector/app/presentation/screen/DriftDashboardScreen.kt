@@ -28,6 +28,7 @@ import com.driftdetector.app.domain.model.FeatureDrift
 import com.driftdetector.app.presentation.components.*
 import com.driftdetector.app.presentation.viewmodel.DriftDashboardState
 import com.driftdetector.app.presentation.viewmodel.DriftDashboardViewModel
+import com.driftdetector.app.presentation.viewmodel.PatchGenerationState
 import org.koin.androidx.compose.koinViewModel
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -38,9 +39,47 @@ fun DriftDashboardScreen(
     viewModel: DriftDashboardViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val patchGenerationState by viewModel.patchGenerationState.collectAsState()
     var selectedTab by remember { mutableStateOf(0) }
     var showAIExplanation by remember { mutableStateOf(false) }
     var selectedDriftResult by remember { mutableStateOf<DriftResult?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Handle patch generation feedback
+    LaunchedEffect(patchGenerationState) {
+        when (patchGenerationState) {
+            is PatchGenerationState.Loading -> {
+                snackbarHostState.showSnackbar(
+                    message = "🔧 Generating intelligent patches...",
+                    duration = SnackbarDuration.Short
+                )
+            }
+            is PatchGenerationState.Success -> {
+                val state = patchGenerationState as PatchGenerationState.Success
+                val message = buildString {
+                    append("✅ Generated ${state.totalGenerated} patch")
+                    if (state.totalGenerated != 1) append("es")
+                    if (state.autoApplied > 0) {
+                        append(" • ${state.autoApplied} auto-applied")
+                    }
+                    if (state.failed > 0) {
+                        append(" • ${state.failed} failed")
+                    }
+                }
+                snackbarHostState.showSnackbar(
+                    message = message,
+                    duration = SnackbarDuration.Long
+                )
+            }
+            is PatchGenerationState.Error -> {
+                snackbarHostState.showSnackbar(
+                    message = "❌ Failed to generate patch: ${(patchGenerationState as PatchGenerationState.Error).message}",
+                    duration = SnackbarDuration.Long
+                )
+            }
+            else -> {}
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -55,7 +94,8 @@ fun DriftDashboardScreen(
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         when (val state = uiState) {
             is DriftDashboardState.Loading -> LoadingScreen()
@@ -281,12 +321,19 @@ fun MetricsSummaryCard(state: DriftDashboardState.Success) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = state.model.name,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                Column {
+                    Text(
+                        text = state.model.name,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = "Model Performance Overview",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    )
+                }
 
                 Surface(
                     shape = MaterialTheme.shapes.small,
@@ -296,6 +343,7 @@ fun MetricsSummaryCard(state: DriftDashboardState.Success) {
                         text = "v${state.model.version}",
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 }
@@ -311,7 +359,8 @@ fun MetricsSummaryCard(state: DriftDashboardState.Success) {
                     label = "Total Drifts",
                     value = state.totalDrifts.toString(),
                     icon = Icons.Default.TrendingUp,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
+                    tooltip = "Total number of drift events detected across all monitoring sessions"
                 )
 
                 val criticalCount = state.driftResults.count { it.driftScore > 0.5 }
@@ -319,7 +368,8 @@ fun MetricsSummaryCard(state: DriftDashboardState.Success) {
                     label = "Critical",
                     value = criticalCount.toString(),
                     icon = Icons.Default.Error,
-                    color = MaterialTheme.colorScheme.error
+                    color = MaterialTheme.colorScheme.error,
+                    tooltip = "Number of high-severity drift events requiring immediate attention"
                 )
 
                 val avgDrift = state.driftResults.takeIf { it.isNotEmpty() }
@@ -330,7 +380,8 @@ fun MetricsSummaryCard(state: DriftDashboardState.Success) {
                     label = "Avg Score",
                     value = String.format("%.3f", avgDrift),
                     icon = Icons.Default.ShowChart,
-                    color = MaterialTheme.colorScheme.tertiary
+                    color = MaterialTheme.colorScheme.tertiary,
+                    tooltip = "Average drift score across all monitoring periods"
                 )
             }
         }
@@ -342,11 +393,16 @@ fun MetricBox(
     label: String,
     value: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    color: Color
+    color: Color,
+    tooltip: String? = null
 ) {
+    var showTooltip by remember { mutableStateOf(false) }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(8.dp)
+        modifier = Modifier
+            .padding(8.dp)
+            .clickable { if (tooltip != null) showTooltip = !showTooltip }
     ) {
         Box(
             modifier = Modifier
@@ -369,11 +425,39 @@ fun MetricBox(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onPrimaryContainer
         )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+            )
+            if (tooltip != null) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = "Info",
+                    modifier = Modifier.size(12.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f)
+                )
+            }
+        }
+
+        // Tooltip overlay
+        if (showTooltip && tooltip != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Surface(
+                color = MaterialTheme.colorScheme.inverseSurface,
+                shape = MaterialTheme.shapes.small,
+                tonalElevation = 8.dp
+            ) {
+                Text(
+                    text = tooltip,
+                    modifier = Modifier.padding(8.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.inverseOnSurface
+                )
+            }
+        }
     }
 }
 
@@ -392,6 +476,48 @@ fun DriftStatusGaugeCard(driftResult: DriftResult) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Drift Level Indicator with clear labels
+            val driftLevel = when {
+                driftResult.driftScore > 0.7 -> "HIGH"
+                driftResult.driftScore > 0.4 -> "MODERATE"
+                driftResult.driftScore > 0.15 -> "LOW"
+                else -> "MINIMAL"
+            }
+
+            val driftColor = when (driftLevel) {
+                "HIGH" -> Color(0xFFF44336)
+                "MODERATE" -> Color(0xFFFF9800)
+                "LOW" -> Color(0xFFFFC107)
+                else -> Color(0xFF4CAF50)
+            }
+
+            // Visual Drift Level Badge
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = driftColor.copy(alpha = 0.2f),
+                modifier = Modifier.padding(8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Drift Level: $driftLevel",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = driftColor
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Score: ${String.format("%.3f", driftResult.driftScore)}",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = driftColor
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             DriftGauge(
                 value = driftResult.driftScore.toFloat(),
                 maxValue = 1f,
@@ -400,18 +526,75 @@ fun DriftStatusGaugeCard(driftResult: DriftResult) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Business Impact Explanation
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "What does this mean?",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = getDriftExplanation(driftLevel, driftResult.driftType),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Action recommendation
             Text(
-                text = when {
-                    driftResult.driftScore > 0.7 -> "⚠️ Immediate action required - High drift detected"
-                    driftResult.driftScore > 0.5 -> "⚡ Attention needed - Moderate drift detected"
-                    driftResult.driftScore > 0.2 -> "ℹ️ Monitor closely - Minor drift detected"
-                    else -> "✅ Model performing within expected parameters"
-                },
+                text = getActionRecommendation(driftLevel),
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
+    }
+}
+
+fun getDriftExplanation(level: String, type: DriftType): String {
+    val baseExplanation = when (type) {
+        DriftType.CONCEPT_DRIFT -> "The relationship between inputs and outputs has changed. Your model's predictions may become less accurate."
+        DriftType.COVARIATE_DRIFT -> "The distribution of input features has shifted. New data looks different from training data."
+        DriftType.PRIOR_DRIFT -> "The distribution of target outcomes has changed. The real-world problem may be evolving."
+        DriftType.NO_DRIFT -> "No significant drift detected. The model is performing as expected."
+    }
+
+    val impactExplanation = when (level) {
+        "HIGH" -> "\n\n📉 Business Impact: Model accuracy may be significantly degraded. Immediate attention required."
+        "MODERATE" -> "\n\n⚠️ Business Impact: Model performance is declining. Action recommended soon."
+        "LOW" -> "\n\nℹ️ Business Impact: Minor drift detected. Monitor closely but no immediate action needed."
+        else -> "\n\n✅ Business Impact: Minimal to no impact on model performance."
+    }
+
+    return baseExplanation + impactExplanation
+}
+
+fun getActionRecommendation(level: String): String {
+    return when (level) {
+        "HIGH" -> "⚡ Recommended Action: Apply available patches or retrain the model immediately"
+        "MODERATE" -> "💡 Recommended Action: Review and apply patches, or schedule model retraining"
+        "LOW" -> "👀 Recommended Action: Continue monitoring. Consider patches if available"
+        else -> "✅ Recommended Action: No action needed. Continue regular monitoring"
     }
 }
 
@@ -1007,9 +1190,11 @@ fun AlertCard(driftResult: DriftResult, level: AlertLevel) {
                     Text("View Details")
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = {
-                    viewModel.generatePatch(driftResult)
-                }) {
+                Button(
+                    onClick = {
+                        viewModel.generatePatch(driftResult)
+                    },
+                ) {
                     Icon(
                         Icons.Default.Build,
                         contentDescription = null,

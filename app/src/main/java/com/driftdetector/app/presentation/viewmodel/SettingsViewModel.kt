@@ -53,17 +53,24 @@ class SettingsViewModel(
                     true
                 ),
                 cloudSyncEnabled = prefs.getBoolean("cloud_sync_enabled", false),
+                driftMonitoringEnabled = prefs.getBoolean("drift_monitoring_enabled", true),
                 monitoringIntervalMinutes = prefs.getInt("monitoring_interval_minutes", 30),
                 driftThreshold = prefs.getFloat("drift_threshold", 0.3f),
                 autoApplyPatches = prefs.getBoolean("auto_apply_patches", false),
+                dataScientistMode = prefs.getBoolean("data_scientist_mode", false),
                 driftAlertsEnabled = prefs.getBoolean("drift_alerts_enabled", true),
                 patchNotificationsEnabled = prefs.getBoolean(
                     "patch_notifications_enabled",
                     true
                 ),
                 criticalAlertsOnly = prefs.getBoolean("critical_alerts_only", false),
+                vibrateOnAlerts = prefs.getBoolean("vibrate_on_alerts", true),
+                emailNotificationsEnabled = prefs.getBoolean("email_notifications_enabled", false),
                 aiExplanationsEnabled = prefs.getBoolean("ai_explanations_enabled", true),
-                dataRetentionDays = prefs.getInt("data_retention_days", 30)
+                dataRetentionDays = prefs.getInt("data_retention_days", 30),
+                autoRegisterModels = prefs.getBoolean("auto_register_models", true),
+                syncBaselineOnDeploy = prefs.getBoolean("sync_baseline_on_deploy", true),
+                autoBackupModels = prefs.getBoolean("auto_backup_models", true)
             )
 
             Timber.d("🎨 Settings loaded - Current theme: ${_uiState.value.themeMode}")
@@ -119,6 +126,11 @@ class SettingsViewModel(
     }
 
     // Monitoring Settings
+    fun toggleDriftMonitoring(enabled: Boolean) {
+        _uiState.update { it.copy(driftMonitoringEnabled = enabled) }
+        savePreference("drift_monitoring_enabled", enabled)
+    }
+
     fun updateMonitoringInterval(minutes: Int) {
         _uiState.update { it.copy(monitoringIntervalMinutes = minutes) }
         savePreference("monitoring_interval_minutes", minutes)
@@ -132,6 +144,11 @@ class SettingsViewModel(
     fun toggleAutoApplyPatches(enabled: Boolean) {
         _uiState.update { it.copy(autoApplyPatches = enabled) }
         savePreference("auto_apply_patches", enabled)
+    }
+
+    fun toggleDataScientistMode(enabled: Boolean) {
+        _uiState.update { it.copy(dataScientistMode = enabled) }
+        savePreference("data_scientist_mode", enabled)
     }
 
     // Notification Settings
@@ -148,6 +165,16 @@ class SettingsViewModel(
     fun toggleCriticalAlertsOnly(enabled: Boolean) {
         _uiState.update { it.copy(criticalAlertsOnly = enabled) }
         savePreference("critical_alerts_only", enabled)
+    }
+
+    fun toggleVibrateOnAlerts(enabled: Boolean) {
+        _uiState.update { it.copy(vibrateOnAlerts = enabled) }
+        savePreference("vibrate_on_alerts", enabled)
+    }
+
+    fun toggleEmailNotifications(enabled: Boolean) {
+        _uiState.update { it.copy(emailNotificationsEnabled = enabled) }
+        savePreference("email_notifications_enabled", enabled)
     }
 
     // AI Settings
@@ -391,6 +418,22 @@ class SettingsViewModel(
             }
         }
     }
+
+    // Model Deployment Settings
+    fun toggleAutoRegisterModels(enabled: Boolean) {
+        _uiState.update { it.copy(autoRegisterModels = enabled) }
+        savePreference("auto_register_models", enabled)
+    }
+
+    fun toggleSyncBaselineOnDeploy(enabled: Boolean) {
+        _uiState.update { it.copy(syncBaselineOnDeploy = enabled) }
+        savePreference("sync_baseline_on_deploy", enabled)
+    }
+
+    fun toggleAutoBackupModels(enabled: Boolean) {
+        _uiState.update { it.copy(autoBackupModels = enabled) }
+        savePreference("auto_backup_models", enabled)
+    }
 }
 
 /**
@@ -406,14 +449,18 @@ data class SettingsUiState(
     val cloudSyncEnabled: Boolean = false,
 
     // Monitoring
+    val driftMonitoringEnabled: Boolean = true,
     val monitoringIntervalMinutes: Int = 30,
     val driftThreshold: Float = 0.3f,
     val autoApplyPatches: Boolean = false,
+    val dataScientistMode: Boolean = false,
 
     // Notifications
     val driftAlertsEnabled: Boolean = true,
     val patchNotificationsEnabled: Boolean = true,
     val criticalAlertsOnly: Boolean = false,
+    val vibrateOnAlerts: Boolean = true,
+    val emailNotificationsEnabled: Boolean = false,
 
     // AI
     val aiExplanationsEnabled: Boolean = true,
@@ -421,6 +468,11 @@ data class SettingsUiState(
 
     // Data Management
     val dataRetentionDays: Int = 30,
+
+    // Model Deployment
+    val autoRegisterModels: Boolean = true,
+    val syncBaselineOnDeploy: Boolean = true,
+    val autoBackupModels: Boolean = true,
 
     // Export State
     val isExporting: Boolean = false,

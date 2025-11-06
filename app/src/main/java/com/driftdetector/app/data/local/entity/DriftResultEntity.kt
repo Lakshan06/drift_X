@@ -93,6 +93,24 @@ data class ModelPredictionEntity(
     val timestamp: Long
 )
 
+@Entity(tableName = "deactivated_models")
+data class DeactivatedModelEntity(
+    @PrimaryKey val id: String,
+    val originalModelId: String,
+    val name: String,
+    val version: String,
+    val modelPath: String,
+    val deactivatedAt: Long,
+    val deactivationReason: String, // "USER_DELETED", "HIGH_DRIFT", "REPLACED", "ERROR"
+    val totalDriftsDetected: Int,
+    val totalPatchesApplied: Int,
+    val lastDriftScore: Double?,
+    val driftHistoryJson: String, // List of drift results
+    val patchHistoryJson: String, // List of patches
+    val metadataJson: String, // Additional model metadata
+    val canRestore: Boolean = true
+)
+
 class DriftResultConverters {
     private val gson = Gson()
 

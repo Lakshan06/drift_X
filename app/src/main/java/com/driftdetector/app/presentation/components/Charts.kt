@@ -15,9 +15,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.*
@@ -196,92 +196,98 @@ fun FeatureAttributionBarChart(
         )
     }
 
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val errorColor = MaterialTheme.colorScheme.error
-    val textColor = MaterialTheme.colorScheme.onSurface
-    val textMeasurer = rememberTextMeasurer()
-
-    Column(modifier = modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(bottom = 12.dp)
         )
 
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(300.dp)
-                .padding(16.dp)
+        if (data.isEmpty()) {
+            Text(
+                text = "No feature attribution data available",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp)
+            )
+            return@Column
+        }
+
+        val maxValue = data.maxOfOrNull { abs(it.value) } ?: 1f
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (data.isEmpty()) return@Canvas
-
-            val width = size.width
-            val height = size.height
-            val padding = 80f
-            val chartHeight = height - 40f
-            val barSpacing = 12f
-
-            val maxValue = data.maxOfOrNull { abs(it.value) } ?: 1f
-            val barWidth = (width - padding) / data.size - barSpacing
-
-            data.forEachIndexed { index, point ->
-                val barHeight = (abs(point.value) / maxValue) * chartHeight * animatedProgress.value
-                val x = padding + index * (barWidth + barSpacing)
-                val y = height - 20f - barHeight
-
-                // Draw bar
-                val barColor = if (point.value >= 0) primaryColor else errorColor
-                drawRoundRect(
-                    color = barColor,
-                    topLeft = Offset(x, y),
-                    size = Size(barWidth, barHeight),
-                    cornerRadius = CornerRadius(4.dp.toPx())
+            data.forEach { point ->
+                FeatureAttributionBar(
+                    featureName = point.label,
+                    value = point.value,
+                    maxValue = maxValue,
+                    progress = animatedProgress.value
                 )
-
-                // Draw value label on top
-                val valueText = String.format("%.2f", point.value)
-                drawContext.canvas.nativeCanvas.apply {
-                    val paint = android.graphics.Paint().apply {
-                        color = textColor.toArgb()
-                        textSize = 10.sp.toPx()
-                        textAlign = android.graphics.Paint.Align.CENTER
-                    }
-                    drawText(
-                        valueText,
-                        x + barWidth / 2,
-                        y - 8f,
-                        paint
-                    )
-                }
-
-                // Draw feature label (rotated)
-                drawContext.canvas.nativeCanvas.apply {
-                    val paint = android.graphics.Paint().apply {
-                        color = textColor.toArgb()
-                        textSize = 10.sp.toPx()
-                        textAlign = android.graphics.Paint.Align.RIGHT
-                    }
-                    save()
-                    rotate(-45f, x + barWidth / 2, height)
-                    drawText(
-                        point.label,
-                        x + barWidth / 2,
-                        height,
-                        paint
-                    )
-                    restore()
-                }
             }
+        }
+    }
+}
 
-            // Draw baseline
-            drawLine(
-                color = textColor.copy(alpha = 0.5f),
-                start = Offset(padding, height - 20f),
-                end = Offset(width, height - 20f),
-                strokeWidth = 1.dp.toPx()
+@Composable
+private fun FeatureAttributionBar(
+    featureName: String,
+    value: Float,
+    maxValue: Float,
+    progress: Float
+) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val errorColor = MaterialTheme.colorScheme.error
+    val normalizedValue = (abs(value) / maxValue).coerceIn(0f, 1f)
+    val barColor = if (value >= 0) primaryColor else errorColor
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Feature name
+        Text(
+            text = featureName,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.width(100.dp),
+            maxLines = 1
+        )
+
+        // Bar
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(24.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(4.dp)
+                )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(normalizedValue * progress)
+                    .background(
+                        color = barColor,
+                        shape = RoundedCornerShape(4.dp)
+                    )
             )
         }
+
+        // Value
+        Text(
+            text = String.format("%.3f", value),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.width(60.dp),
+            color = barColor
+        )
     }
 }
 
@@ -295,79 +301,69 @@ fun DriftHeatmap(
     modifier: Modifier = Modifier,
     title: String = "Drift Heatmap"
 ) {
-    val textColor = MaterialTheme.colorScheme.onSurface
-
-    Column(modifier = modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(bottom = 12.dp)
         )
 
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp)
-                .padding(16.dp)
+        if (featureNames.isEmpty()) {
+            Text(
+                text = "No drift data available",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp)
+            )
+            return@Column
+        }
+
+        // Grid layout for heatmap
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (featureNames.isEmpty()) return@Canvas
-
-            val cellWidth = size.width / featureNames.size.coerceAtLeast(1)
-            val cellHeight = size.height - 40f
-
             featureNames.forEachIndexed { index, featureName ->
                 val score = driftScores.getOrNull(index) ?: 0f
                 
                 // Color gradient from green (low drift) to red (high drift)
-                val color = when {
+                val cellColor = when {
                     score < 0.2f -> Color(0xFF4CAF50) // Green
                     score < 0.4f -> Color(0xFFFFC107) // Yellow
                     score < 0.6f -> Color(0xFFFF9800) // Orange
                     else -> Color(0xFFF44336) // Red
                 }
 
-                val x = index * cellWidth
-                
-                // Draw cell
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(x + 2f, 0f),
-                    size = Size(cellWidth - 4f, cellHeight),
-                    cornerRadius = CornerRadius(4.dp.toPx())
-                )
-
-                // Draw score
-                drawContext.canvas.nativeCanvas.apply {
-                    val paint = android.graphics.Paint().apply {
-                        this.color = Color.White.toArgb()
-                        textSize = 12.sp.toPx()
-                        textAlign = android.graphics.Paint.Align.CENTER
-                        isFakeBoldText = true
-                    }
-                    drawText(
-                        String.format("%.2f", score),
-                        x + cellWidth / 2,
-                        cellHeight / 2 + 6f,
-                        paint
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .background(
+                            color = cellColor,
+                            shape = RoundedCornerShape(4.dp)
+                        )
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (featureName.length > 20)
+                            featureName.take(18) + ".."
+                        else featureName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                     )
-                }
 
-                // Draw feature name
-                drawContext.canvas.nativeCanvas.apply {
-                    val paint = android.graphics.Paint().apply {
-                        this.color = textColor.toArgb()
-                        textSize = 10.sp.toPx()
-                        textAlign = android.graphics.Paint.Align.CENTER
-                    }
-                    val label = if (featureName.length > 10) 
-                        featureName.take(8) + ".." 
-                    else featureName
-                    
-                    drawText(
-                        label,
-                        x + cellWidth / 2,
-                        size.height - 10f,
-                        paint
+                    Text(
+                        text = String.format("%.3f", score),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                     )
                 }
             }

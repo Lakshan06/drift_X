@@ -183,8 +183,23 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
+    // WebSocket for real-time communication
+    implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
+    implementation("org.java-websocket:Java-WebSocket:1.5.6")
+
     // WorkManager for Background Tasks
     implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    // Authentication & JWT
+    implementation("com.auth0.android:jwtdecode:2.0.2")
+
+    // Firebase Cloud Messaging for push notifications
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
+    implementation("com.google.firebase:firebase-analytics-ktx")
+
+    // Connectivity monitoring
+    implementation("com.github.pwittchen:reactivenetwork-rx2:3.0.8")
 
     // MPAndroidChart for Visualizations
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")

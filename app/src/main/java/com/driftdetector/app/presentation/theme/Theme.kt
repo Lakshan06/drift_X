@@ -13,53 +13,53 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 /**
- * Dark Color Scheme - Sci-Fi / Fantasy Tech Theme
+ * Dark Color Scheme - Professional Oceanic Theme
  * Primary theme for DriftGuardAI
  */
 private val DarkColorScheme = darkColorScheme(
-    // Primary - Cyber Indigo for main actions
-    primary = CyberIndigo,
-    onPrimary = StardustWhite,
-    primaryContainer = MysticViolet,
-    onPrimaryContainer = StardustWhite,
+    // Primary - Oceanic Teal for main actions
+    primary = OceanicTeal,
+    onPrimary = Ivory,
+    primaryContainer = Color(0xFF236B76),
+    onPrimaryContainer = Ivory,
 
-    // Secondary - Mystic Violet for navigation
-    secondary = MysticViolet,
-    onSecondary = StardustWhite,
-    secondaryContainer = Color(0xFF4A3F7E),
-    onSecondaryContainer = StardustWhite,
+    // Secondary - Coral Blush for accents
+    secondary = CoralBlush,
+    onSecondary = Ivory,
+    secondaryContainer = Color(0xFFCC5850),
+    onSecondaryContainer = Ivory,
 
-    // Tertiary - Emerald for success states
-    tertiary = EmeraldFade,
-    onTertiary = GalaxyCharcoal,
-    tertiaryContainer = Color(0xFF2A8A61),
-    onTertiaryContainer = StardustWhite,
+    // Tertiary - Mint Green for success states
+    tertiary = MintGreen,
+    onTertiary = SlateGray,
+    tertiaryContainer = Color(0xFF2E8A68),
+    onTertiaryContainer = Ivory,
 
-    // Error - Hyper Crimson for critical states
-    error = HyperCrimson,
-    onError = StardustWhite,
-    errorContainer = Color(0xFF8A1942),
-    onErrorContainer = StardustWhite,
+    // Error - Flame Red for critical states
+    error = FlameRed,
+    onError = Ivory,
+    errorContainer = Color(0xFF9A1C2A),
+    onErrorContainer = Ivory,
 
-    // Background - Galaxy Charcoal
-    background = GalaxyCharcoal,
-    onBackground = StardustWhite,
+    // Background - Slate Gray
+    background = SlateGray,
+    onBackground = Ivory,
 
-    // Surface - Deep Space Navy for cards
-    surface = DeepSpaceNavy,
-    onSurface = StardustWhite,
-    surfaceVariant = CosmicGraphite,
-    onSurfaceVariant = LapisSilver,
-    surfaceTint = CyberIndigo,
+    // Surface - Gunmetal for cards
+    surface = Gunmetal,
+    onSurface = Ivory,
+    surfaceVariant = Color(0xFF434952),
+    onSurfaceVariant = MistGray,
+    surfaceTint = OceanicTeal,
 
-    // Outline - Eclipse Slate
-    outline = EclipseSlate,
-    outlineVariant = Color(0xFF3D4452),
+    // Outline - Mist Gray
+    outline = MistGray,
+    outlineVariant = Color(0xFF5A6169),
 
     // Inverse colors
-    inverseSurface = StardustWhite,
-    inverseOnSurface = GalaxyCharcoal,
-    inversePrimary = CyberIndigo,
+    inverseSurface = Ivory,
+    inverseOnSurface = SlateGray,
+    inversePrimary = OceanicTeal,
 
     // Scrim for modal overlays
     scrim = Color(0xCC000000)
@@ -67,32 +67,32 @@ private val DarkColorScheme = darkColorScheme(
 
 /**
  * Light Color Scheme
- * Optional light mode (most users will prefer dark for dashboards)
+ * Optional light mode
  */
 private val LightColorScheme = lightColorScheme(
-    // Primary - Cyber Indigo
-    primary = CyberIndigo,
-    onPrimary = StardustWhite,
-    primaryContainer = Color(0xFFE8EDFF),
-    onPrimaryContainer = GalaxyCharcoal,
+    // Primary - Oceanic Teal
+    primary = OceanicTeal,
+    onPrimary = Ivory,
+    primaryContainer = Color(0xFFB3E5EC),
+    onPrimaryContainer = SlateGray,
 
-    // Secondary - Mystic Violet
-    secondary = MysticViolet,
-    onSecondary = StardustWhite,
-    secondaryContainer = Color(0xFFE8DEF8),
-    onSecondaryContainer = GalaxyCharcoal,
+    // Secondary - Coral Blush
+    secondary = CoralBlush,
+    onSecondary = Ivory,
+    secondaryContainer = Color(0xFFFFDBD7),
+    onSecondaryContainer = SlateGray,
 
-    // Tertiary - Emerald
-    tertiary = EmeraldFade,
-    onTertiary = GalaxyCharcoal,
-    tertiaryContainer = Color(0xFFD0F4E4),
-    onTertiaryContainer = GalaxyCharcoal,
+    // Tertiary - Mint Green
+    tertiary = MintGreen,
+    onTertiary = SlateGray,
+    tertiaryContainer = Color(0xFFB8F4D7),
+    onTertiaryContainer = SlateGray,
 
-    // Error - Hyper Crimson
-    error = HyperCrimson,
-    onError = StardustWhite,
+    // Error - Flame Red
+    error = FlameRed,
+    onError = Ivory,
     errorContainer = Color(0xFFF9DEDC),
-    onErrorContainer = GalaxyCharcoal,
+    onErrorContainer = SlateGray,
 
     // Background - Light
     background = LightBackground,
@@ -101,18 +101,18 @@ private val LightColorScheme = lightColorScheme(
     // Surface - White
     surface = LightSurface,
     onSurface = LightOnSurface,
-    surfaceVariant = Color(0xFFE7E0EC),
-    onSurfaceVariant = Color(0xFF49454F),
-    surfaceTint = CyberIndigo,
+    surfaceVariant = Color(0xFFE7E9EB),
+    onSurfaceVariant = Color(0xFF4B5563),
+    surfaceTint = OceanicTeal,
 
     // Outline
-    outline = EclipseSlate,
+    outline = MistGray,
     outlineVariant = Color(0xFFC7C5D0),
 
     // Inverse colors
-    inverseSurface = GalaxyCharcoal,
-    inverseOnSurface = StardustWhite,
-    inversePrimary = CyberIndigo,
+    inverseSurface = SlateGray,
+    inverseOnSurface = Ivory,
+    inversePrimary = OceanicTeal,
 
     // Scrim
     scrim = Color(0x99000000)
@@ -146,13 +146,13 @@ fun DriftDetectorTheme(
         SideEffect {
             val window = (view.context as Activity).window
             window.statusBarColor = if (darkTheme) {
-                GalaxyCharcoal.toArgb()
+                SlateGray.toArgb()
             } else {
-                CyberIndigo.toArgb()
+                OceanicTeal.toArgb()
             }
 
             window.navigationBarColor = if (darkTheme) {
-                GalaxyCharcoal.toArgb()
+                SlateGray.toArgb()
             } else {
                 Color.White.toArgb()
             }

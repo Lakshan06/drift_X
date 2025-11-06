@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
@@ -11,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -29,12 +31,17 @@ import com.driftdetector.app.presentation.viewmodel.SettingsViewModel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import com.driftdetector.app.core.monitoring.ModelMonitoringService
+import com.driftdetector.app.core.util.PermissionHelper
 import org.koin.android.ext.android.inject
 import org.koin.androidx.compose.koinViewModel
 import timber.log.Timber
 
 class MainActivity : ComponentActivity() {
     private val monitoringService: ModelMonitoringService by inject()
+
+    // Permission launchers
+    private lateinit var storagePermissionLauncher: ActivityResultLauncher<Array<String>>
+    private lateinit var manageStorageLauncher: ActivityResultLauncher<android.content.Intent>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Log.d("ACTIVITY", "=== MainActivity.onCreate() START ===")
@@ -44,9 +51,15 @@ class MainActivity : ComponentActivity() {
             super.onCreate(savedInstanceState)
             Log.d("ACTIVITY", "✓ super.onCreate() completed")
 
+            // Initialize permission launchers
+            initializePermissionLaunchers()
+
             // Start continuous model monitoring
             monitoringService.startMonitoring()
             Log.d("ACTIVITY", "✓ Monitoring service started")
+
+            // Check and request storage permissions
+            checkStoragePermissions()
 
             setContent {
                 Log.d("ACTIVITY", "✓ setContent block entered")
@@ -77,6 +90,72 @@ class MainActivity : ComponentActivity() {
         }
 
         Log.d("ACTIVITY", "=== MainActivity.onCreate() COMPLETE ===")
+    }
+
+    /**
+     * Initialize permission request launchers
+     */
+    private fun initializePermissionLaunchers() {
+        // Standard storage permissions launcher
+        storagePermissionLauncher =
+            PermissionHelper.createStoragePermissionLauncher(this) { granted ->
+                if (granted) {
+                    Timber.i("✅ Storage permissions granted")
+                } else {
+                    Timber.w("⚠️ Storage permissions denied - file access may be limited")
+                    // Show explanation to user
+                    showPermissionDeniedMessage()
+                }
+            }
+
+        // MANAGE_EXTERNAL_STORAGE permission launcher (Android 11+)
+        manageStorageLauncher = PermissionHelper.createManageStorageLauncher(this) { granted ->
+            if (granted) {
+                Timber.i("✅ Full storage access granted")
+            } else {
+                Timber.w("⚠️ Full storage access denied - requesting standard permissions")
+                // Fallback to standard permissions
+                PermissionHelper.requestStoragePermissions(storagePermissionLauncher)
+            }
+        }
+    }
+
+    /**
+     * Check if storage permissions are granted, request if not
+     */
+    private fun checkStoragePermissions() {
+        if (!PermissionHelper.hasStoragePermissions(this)) {
+            Timber.d("📋 Storage permissions not granted, requesting...")
+
+            // For Android 11+ (API 30+), try to request MANAGE_EXTERNAL_STORAGE first
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                // Show rationale first (optional)
+                Timber.d(PermissionHelper.getPermissionRationale())
+
+                // Request MANAGE_EXTERNAL_STORAGE for full access
+                PermissionHelper.requestManageStoragePermission(this, manageStorageLauncher)
+            } else {
+                // For older versions, request standard permissions
+                PermissionHelper.requestStoragePermissions(storagePermissionLauncher)
+            }
+        } else {
+            Timber.i("✅ Storage permissions already granted")
+        }
+    }
+
+    /**
+     * Show message when permissions are denied
+     */
+    private fun showPermissionDeniedMessage() {
+        Timber.w(
+            """
+            ⚠️ Storage access denied
+            
+            ${PermissionHelper.getPermissionRationale()}
+            
+            ${PermissionHelper.getManualPermissionInstructions(this)}
+        """.trimIndent()
+        )
     }
 
     override fun onStart() {
@@ -128,7 +207,13 @@ fun DriftDetectorApp() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("DriftGuardAI") },
+                title = {
+                    Text(
+                        "DriftGuardAI",
+                        fontWeight = FontWeight.ExtraBold,
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer

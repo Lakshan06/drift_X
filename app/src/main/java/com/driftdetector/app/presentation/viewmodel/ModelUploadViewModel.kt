@@ -84,6 +84,23 @@ class ModelUploadViewModel(
                     successMessage = null
                 )
 
+                // Take persistent URI permissions for offline access (Google Drive, etc.)
+                uris.forEach { uri ->
+                    try {
+                        context.contentResolver.takePersistableUriPermission(
+                            uri,
+                            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                        Timber.d("✅ Persistent permission granted for: $uri")
+                    } catch (e: SecurityException) {
+                        Timber.w(
+                            e,
+                            "⚠️ Could not take persistent permission for: $uri (may not support it)"
+                        )
+                        // Continue anyway - file may still be accessible
+                    }
+                }
+
                 // Simulate upload progress
                 for (i in 0..100 step 10) {
                     _uploadProgress.value = i / 100f
@@ -134,10 +151,24 @@ class ModelUploadViewModel(
 
                 Timber.i("✅ Successfully uploaded ${newFiles.size} files")
 
-                // Auto-process if we have both model and data
-                if (modelFile != null && dataFile != null) {
-                    delay(500) // Small delay for UI feedback
-                    processFilesAutomatically()
+                // Check what we have and process accordingly
+                when {
+                    // Both model and data - full processing
+                    modelFile != null && dataFile != null -> {
+                        delay(500)
+                        processFilesAutomatically()
+                    }
+                    // Only model - register it to database
+                    modelFile != null && dataFile == null -> {
+                        delay(500)
+                        processModelOnly()
+                    }
+                    // Only data - needs a model first
+                    modelFile == null && dataFile != null -> {
+                        _uiState.value = _uiState.value.copy(
+                            successMessage = "✅ Data file uploaded!\n\n⚠️ Please upload a model file to begin drift detection."
+                        )
+                    }
                 }
 
             } catch (e: Exception) {
@@ -229,6 +260,78 @@ class ModelUploadViewModel(
         }
     }
 
+    /**
+     * Process model-only upload - register to database without data
+     */
+    private fun processModelOnly() {
+        viewModelScope.launch {
+            try {
+                val model = modelFile
+                if (model == null || model.uri == null) {
+                    Timber.w("Cannot process: missing model file")
+                    return@launch
+                }
+
+                Timber.d(" Processing model file only...")
+                _uiState.value = _uiState.value.copy(
+                    isProcessing = true,
+                    error = null
+                )
+
+                // Show processing progress
+                for (i in 0..100 step 5) {
+                    _uploadProgress.value = i / 100f
+                    delay(30)
+                }
+
+                // Process and register model
+                val result = fileUploadProcessor.processModelFile(
+                    uri = model.uri,
+                    fileName = model.name
+                )
+
+                _uploadProgress.value = 0f
+
+                if (result.isSuccess) {
+                    val registeredModel = result.getOrThrow()
+
+                    // Update state with registered model
+                    _uiState.value = _uiState.value.copy(
+                        isProcessing = false,
+                        processedModel = registeredModel,
+                        successMessage = buildModelOnlySuccessMessage(registeredModel),
+                        uploadedFiles = _uiState.value.uploadedFiles.map {
+                            if (it.id == model.id) {
+                                it.copy(
+                                    processed = true,
+                                    processingStatus = "✅ Model registered & ready"
+                                )
+                            } else it
+                        }
+                    )
+
+                    Timber.i("✅ Model registered successfully: ${registeredModel.name}")
+
+                } else {
+                    val error = result.exceptionOrNull()
+                    Timber.e(error, "❌ Failed to process model")
+                    _uiState.value = _uiState.value.copy(
+                        isProcessing = false,
+                        error = "Failed to register model: ${error?.message}"
+                    )
+                }
+
+            } catch (e: Exception) {
+                Timber.e(e, "❌ Failed to process model")
+                _uiState.value = _uiState.value.copy(
+                    isProcessing = false,
+                    error = "Failed to register model: ${e.message}"
+                )
+                _uploadProgress.value = 0f
+            }
+        }
+    }
+
     private fun buildSuccessMessage(result: ProcessingResult): String {
         val sb = StringBuilder()
         sb.appendLine("✅ Processing Complete!")
@@ -260,6 +363,24 @@ class ModelUploadViewModel(
             sb.appendLine("   Model is performing well!")
         }
 
+        return sb.toString()
+    }
+
+    private fun buildModelOnlySuccessMessage(model: MLModel): String {
+        val sb = StringBuilder()
+        sb.appendLine("✅ Model Registered Successfully!")
+        sb.appendLine()
+        sb.appendLine(" Model: ${model.name}")
+        sb.appendLine("️ Version: ${model.version}")
+        sb.appendLine("📊 Input Features: ${model.inputFeatures.size}")
+        sb.appendLine("️ Output Labels: ${model.outputLabels.size}")
+        sb.appendLine()
+        sb.appendLine("📌 NEXT STEPS:")
+        sb.appendLine("1. Upload a dataset (.csv, .json, .parquet)")
+        sb.appendLine("2. System will detect drift automatically")
+        sb.appendLine("3. Patches will be generated if needed")
+        sb.appendLine()
+        sb.appendLine("Your model is now active and ready to monitor!")
         return sb.toString()
     }
 
@@ -333,48 +454,173 @@ class ModelUploadViewModel(
     fun importFromUrl(url: String) {
         viewModelScope.launch {
             try {
-                Timber.d(" Importing from URL: $url")
+                Timber.d("🌐 Importing from URL: $url")
                 _uiState.value = _uiState.value.copy(
                     isUploading = true,
-                    error = null
+                    error = null,
+                    successMessage = null
                 )
 
-                // Simulate download progress
-                for (i in 0..100 step 5) {
-                    _uploadProgress.value = i / 100f
-                    delay(50)
+                // Validate URL
+                if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                    _uiState.value = _uiState.value.copy(
+                        isUploading = false,
+                        error = "Invalid URL. Must start with http:// or https://"
+                    )
+                    return@launch
                 }
 
                 // Extract filename from URL
-                val fileName = url.substringAfterLast("/")
+                val fileName = url.substringAfterLast("/").substringBefore("?")
+                if (fileName.isEmpty()) {
+                    _uiState.value = _uiState.value.copy(
+                        isUploading = false,
+                        error = "Could not extract filename from URL"
+                    )
+                    return@launch
+                }
+
                 val format = extractFormat(fileName)
                 val isModel = isModelFile(fileName)
 
-                val newFile = UploadedFile(
-                    name = fileName,
-                    size = "3.2 MB", // Simulated
-                    format = format,
-                    isModel = isModel,
-                    uri = Uri.parse(url),
-                    metadata = mapOf(
-                        "source" to "url",
-                        "url" to url,
-                        "downloadDate" to System.currentTimeMillis().toString()
-                    ),
-                    processed = false
-                )
+                // Show progress
+                for (i in 0..30 step 10) {
+                    _uploadProgress.value = i / 100f
+                    delay(100)
+                }
 
-                _uiState.value = _uiState.value.copy(
-                    uploadedFiles = _uiState.value.uploadedFiles + newFile,
-                    isUploading = false,
-                    successMessage = "File imported from URL!"
-                )
+                // Download file using Android DownloadManager
+                val downloadManager =
+                    context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                val request = android.app.DownloadManager.Request(Uri.parse(url)).apply {
+                    setTitle("Downloading $fileName")
+                    setDescription("DriftGuardAI - Downloading model/data file")
+                    setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    setDestinationInExternalPublicDir(
+                        android.os.Environment.DIRECTORY_DOWNLOADS,
+                        "DriftGuardAI_$fileName"
+                    )
+                    setAllowedOverMetered(true)
+                    setAllowedOverRoaming(false)
+                }
 
-                _uploadProgress.value = 1f
-                delay(500)
+                val downloadId = downloadManager.enqueue(request)
+                Timber.d("📥 Download started with ID: $downloadId")
+
+                // Monitor download progress
+                var downloading = true
+                while (downloading) {
+                    val query = android.app.DownloadManager.Query().setFilterById(downloadId)
+                    val cursor = downloadManager.query(query)
+
+                    if (cursor.moveToFirst()) {
+                        val statusIndex =
+                            cursor.getColumnIndex(android.app.DownloadManager.COLUMN_STATUS)
+                        val status = cursor.getInt(statusIndex)
+
+                        val bytesDownloadedIndex =
+                            cursor.getColumnIndex(android.app.DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                        val bytesTotalIndex =
+                            cursor.getColumnIndex(android.app.DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+
+                        val bytesDownloaded = cursor.getLong(bytesDownloadedIndex)
+                        val bytesTotal = cursor.getLong(bytesTotalIndex)
+
+                        when (status) {
+                            android.app.DownloadManager.STATUS_RUNNING -> {
+                                if (bytesTotal > 0) {
+                                    val progress =
+                                        (bytesDownloaded.toFloat() / bytesTotal.toFloat()) * 0.7f + 0.3f
+                                    _uploadProgress.value = progress
+                                }
+                                delay(500)
+                            }
+
+                            android.app.DownloadManager.STATUS_SUCCESSFUL -> {
+                                _uploadProgress.value = 1f
+                                downloading = false
+
+                                // Get downloaded file URI
+                                val uriIndex =
+                                    cursor.getColumnIndex(android.app.DownloadManager.COLUMN_LOCAL_URI)
+                                if (uriIndex < 0) {
+                                    _uiState.value = _uiState.value.copy(
+                                        isUploading = false,
+                                        error = "Could not get downloaded file location"
+                                    )
+                                    return@launch
+                                }
+                                val uriString = cursor.getString(uriIndex)
+                                val fileUri = Uri.parse(uriString)
+
+                                // Get actual file size
+                                val actualSize = getFileSize(fileUri)
+
+                                val newFile = UploadedFile(
+                                    name = fileName,
+                                    size = formatFileSize(actualSize),
+                                    format = format,
+                                    isModel = isModel,
+                                    uri = fileUri,
+                                    metadata = mapOf(
+                                        "source" to "url",
+                                        "url" to url,
+                                        "downloadDate" to System.currentTimeMillis().toString(),
+                                        "downloadId" to downloadId.toString()
+                                    ),
+                                    processed = false,
+                                    processingStatus = "UPLOADED"
+                                )
+
+                                // Store model/data file references
+                                if (isModel) {
+                                    modelFile = newFile
+                                } else {
+                                    dataFile = newFile
+                                }
+
+                                _uiState.value = _uiState.value.copy(
+                                    uploadedFiles = _uiState.value.uploadedFiles + newFile,
+                                    isUploading = false,
+                                    successMessage = "✅ Successfully downloaded file from URL!"
+                                )
+
+                                Timber.i("✅ Successfully imported from URL: $fileName")
+
+                                // Auto-process if we have both model and data
+                                if (modelFile != null && dataFile != null) {
+                                    delay(500)
+                                    processFilesAutomatically()
+                                }
+                            }
+
+                            android.app.DownloadManager.STATUS_FAILED -> {
+                                downloading = false
+                                val reasonIndex =
+                                    cursor.getColumnIndex(android.app.DownloadManager.COLUMN_REASON)
+                                val reason = cursor.getInt(reasonIndex)
+                                _uiState.value = _uiState.value.copy(
+                                    isUploading = false,
+                                    error = "Download failed (code: $reason). Check your internet connection and try again."
+                                )
+                                Timber.e("❌ Download failed with reason: $reason")
+                            }
+
+                            android.app.DownloadManager.STATUS_PAUSED -> {
+                                delay(500)
+                            }
+                        }
+                    } else {
+                        downloading = false
+                        _uiState.value = _uiState.value.copy(
+                            isUploading = false,
+                            error = "Download was cancelled or failed"
+                        )
+                    }
+                    cursor.close()
+                }
+
                 _uploadProgress.value = 0f
-
-                Timber.i("✅ Successfully imported from URL")
 
             } catch (e: Exception) {
                 Timber.e(e, "❌ Failed to import from URL")

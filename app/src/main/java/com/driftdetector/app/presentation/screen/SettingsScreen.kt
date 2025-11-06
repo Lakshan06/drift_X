@@ -4,7 +4,38 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.Brightness4
+import androidx.compose.material.icons.filled.BuildCircle
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.DataUsage
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -88,13 +119,22 @@ fun SettingsScreen(
         // Monitoring Settings
         item {
             SettingsSection(title = "Model Monitoring") {
+                SwitchSettingItem(
+                    icon = Icons.Default.Visibility,
+                    title = "Enable Drift Monitoring",
+                    subtitle = "Continuously monitor models for drift",
+                    checked = uiState.driftMonitoringEnabled,
+                    onCheckedChange = { viewModel.toggleDriftMonitoring(it) }
+                )
+                
                 SliderSettingItem(
                     icon = Icons.Default.Timer,
                     title = "Monitoring Interval",
                     subtitle = "${uiState.monitoringIntervalMinutes} minutes",
                     value = uiState.monitoringIntervalMinutes.toFloat(),
                     valueRange = 5f..120f,
-                    onValueChange = { viewModel.updateMonitoringInterval(it.toInt()) }
+                    onValueChange = { viewModel.updateMonitoringInterval(it.toInt()) },
+                    enabled = uiState.driftMonitoringEnabled
                 )
                 
                 SliderSettingItem(
@@ -103,7 +143,8 @@ fun SettingsScreen(
                     subtitle = String.format("%.2f - Alert when drift exceeds this value", uiState.driftThreshold),
                     value = uiState.driftThreshold,
                     valueRange = 0.1f..0.9f,
-                    onValueChange = { viewModel.updateDriftThreshold(it) }
+                    onValueChange = { viewModel.updateDriftThreshold(it) },
+                    enabled = uiState.driftMonitoringEnabled
                 )
                 
                 SwitchSettingItem(
@@ -112,6 +153,14 @@ fun SettingsScreen(
                     subtitle = "Automatically apply validated patches",
                     checked = uiState.autoApplyPatches,
                     onCheckedChange = { viewModel.toggleAutoApplyPatches(it) }
+                )
+                
+                SwitchSettingItem(
+                    icon = Icons.Default.Science,
+                    title = "Data Scientist Mode",
+                    subtitle = "Show advanced metrics and configuration options",
+                    checked = uiState.dataScientistMode,
+                    onCheckedChange = { viewModel.toggleDataScientistMode(it) }
                 )
             }
         }
@@ -141,6 +190,22 @@ fun SettingsScreen(
                     subtitle = "Only notify for high-severity drift",
                     checked = uiState.criticalAlertsOnly,
                     onCheckedChange = { viewModel.toggleCriticalAlertsOnly(it) }
+                )
+                
+                SwitchSettingItem(
+                    icon = Icons.Default.Vibration,
+                    title = "Vibrate on Alerts",
+                    subtitle = "Vibrate device when critical alerts occur",
+                    checked = uiState.vibrateOnAlerts,
+                    onCheckedChange = { viewModel.toggleVibrateOnAlerts(it) }
+                )
+                
+                SwitchSettingItem(
+                    icon = Icons.Default.Email,
+                    title = "Email Notifications",
+                    subtitle = "Send drift reports via email (requires setup)",
+                    checked = uiState.emailNotificationsEnabled,
+                    onCheckedChange = { viewModel.toggleEmailNotifications(it) }
                 )
             }
         }
@@ -189,6 +254,35 @@ fun SettingsScreen(
                     title = "Export Data",
                     subtitle = "Export drift reports and patch history",
                     onClick = { viewModel.exportData() }
+                )
+            }
+        }
+
+        // Model Deployment Settings
+        item {
+            SettingsSection(title = "Model Deployment") {
+                SwitchSettingItem(
+                    icon = Icons.Default.Upload,
+                    title = "Auto-Register on Upload",
+                    subtitle = "Automatically register models after upload",
+                    checked = uiState.autoRegisterModels,
+                    onCheckedChange = { viewModel.toggleAutoRegisterModels(it) }
+                )
+                
+                SwitchSettingItem(
+                    icon = Icons.Default.Sync,
+                    title = "Sync Baseline on Deploy",
+                    subtitle = "Capture baseline statistics when deploying",
+                    checked = uiState.syncBaselineOnDeploy,
+                    onCheckedChange = { viewModel.toggleSyncBaselineOnDeploy(it) }
+                )
+                
+                SwitchSettingItem(
+                    icon = Icons.Default.Backup,
+                    title = "Auto-Backup Models",
+                    subtitle = "Automatically backup model files on changes",
+                    checked = uiState.autoBackupModels,
+                    onCheckedChange = { viewModel.toggleAutoBackupModels(it) }
                 )
             }
         }
@@ -300,7 +394,8 @@ fun ColumnScope.SliderSettingItem(
     subtitle: String,
     value: Float,
     valueRange: ClosedFloatingPointRange<Float>,
-    onValueChange: (Float) -> Unit
+    onValueChange: (Float) -> Unit,
+    enabled: Boolean = true
 ) {
     Column(
         modifier = Modifier
@@ -335,7 +430,8 @@ fun ColumnScope.SliderSettingItem(
             valueRange = valueRange,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 40.dp, top = 8.dp)
+                .padding(start = 40.dp, top = 8.dp),
+            enabled = enabled
         )
     }
 }

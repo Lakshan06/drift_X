@@ -99,3 +99,33 @@ interface ModelPredictionDao {
     @Query("SELECT COUNT(*) FROM model_predictions WHERE modelId = :modelId")
     suspend fun getPredictionCount(modelId: String): Int
 }
+
+@Dao
+interface DeactivatedModelDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDeactivatedModel(model: DeactivatedModelEntity)
+
+    @Query("SELECT * FROM deactivated_models ORDER BY deactivatedAt DESC")
+    fun getAllDeactivatedModels(): Flow<List<DeactivatedModelEntity>>
+
+    @Query("SELECT * FROM deactivated_models WHERE id = :id")
+    suspend fun getDeactivatedModelById(id: String): DeactivatedModelEntity?
+
+    @Query("SELECT * FROM deactivated_models WHERE originalModelId = :originalModelId")
+    suspend fun getDeactivatedModelByOriginalId(originalModelId: String): DeactivatedModelEntity?
+
+    @Query("SELECT * FROM deactivated_models WHERE deactivationReason = :reason ORDER BY deactivatedAt DESC")
+    fun getDeactivatedModelsByReason(reason: String): Flow<List<DeactivatedModelEntity>>
+
+    @Delete
+    suspend fun deleteDeactivatedModel(model: DeactivatedModelEntity)
+
+    @Query("DELETE FROM deactivated_models WHERE deactivatedAt < :cutoffTime AND canRestore = 0")
+    suspend fun cleanupOldDeactivatedModels(cutoffTime: Long)
+
+    @Query("SELECT COUNT(*) FROM deactivated_models")
+    suspend fun getDeactivatedModelCount(): Int
+
+    @Query("SELECT * FROM deactivated_models WHERE canRestore = 1 ORDER BY deactivatedAt DESC")
+    fun getRestorableModels(): Flow<List<DeactivatedModelEntity>>
+}

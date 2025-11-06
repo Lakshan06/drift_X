@@ -153,7 +153,9 @@ Feel free to ask me anything! 😊"""
             questionLower.contains("how are you") || questionLower.contains("how r u") ||
                     questionLower.contains("how's it going") || questionLower.contains("how is it going") ||
                     questionLower.contains("how are things") || questionLower.contains("what's up") ||
-                    questionLower.contains("whats up") || questionLower.contains("wassup") -> {
+                    questionLower.contains("whats up") || questionLower.contains("wassup") || questionLower.contains(
+                "what up"
+            ) -> {
                 """😊 **I'm doing great, thanks for asking!**
 
 I'm always ready and excited to help with drift detection questions!
@@ -429,6 +431,513 @@ I can answer questions about drift **instantly** without any downloads or cloud 
 And more importantly - **what can I help you with today?** 😊"""
             }
 
+            // ===== FILE UPLOAD & APP USAGE =====
+
+            // How to upload files
+            questionLower.contains("how") && (questionLower.contains("upload") || questionLower.contains(
+                "add"
+            ) ||
+                    questionLower.contains("import")) && (questionLower.contains("file") ||
+                    questionLower.contains("model") || questionLower.contains("data")) -> {
+                """**📤 How to Upload Files in DriftGuardAI**
+
+**Uploading Models:**
+1. Tap **Models** (bottom nav)
+2. Tap **+** button (top-right)
+3. Select your model file
+4. Wait for processing
+5. Done! ✅
+
+**Uploading Data:**
+1. Open a model
+2. Tap **Upload Data**
+3. Select CSV/JSON file
+4. Drift detection runs automatically
+
+**Transfer from Computer:**
+```bash
+# Using ADB
+adb push model.onnx /sdcard/Download/
+adb push data.csv /sdcard/Download/
+```
+
+**Supported:**
+• Models: .onnx, .tflite, .h5, .pb, .pt, .pth
+• Data: .csv, .json, .tsv, .txt, .psv, .dat
+
+**Questions?** Ask: "supported formats" or "CSV format"
+"""
+            }
+
+            // Supported formats
+            questionLower.contains("what") && (questionLower.contains("file") ||
+                    questionLower.contains("format") || questionLower.contains("support") ||
+                    questionLower.contains("can i upload") || questionLower.contains("accept")) -> {
+                """**📁 Supported File Formats**
+
+**MODEL FILES:**
+✅ ONNX (.onnx)
+✅ TensorFlow Lite (.tflite)
+✅ Keras (.h5, .keras)
+✅ TensorFlow (.pb)
+✅ PyTorch (.pt, .pth)
+
+**DATA FILES:**
+✅ CSV (.csv) - Auto header detection
+✅ JSON (.json) - Multiple formats
+✅ TSV (.tsv) - Tab-separated
+✅ Text (.txt) - Auto-detect delimiter
+✅ Pipe (.psv) - Pipe-separated
+✅ Space (.dat) - Space-separated
+
+**Features:**
+→ Automatic format detection
+→ Header handling
+→ Quote/escape support
+→ Missing value handling
+→ Feature normalization
+
+**Size Limits:**
+• Models: 500 MB
+• Data: 100 MB
+
+**Not Supported:**
+❌ Zip archives (extract first)
+❌ Git LFS pointers (download actual file)
+
+**More details?** Ask: "CSV format" or "JSON structure"
+"""
+            }
+
+            // CSV format questions
+            (questionLower.contains("csv") || questionLower.contains("comma")) &&
+                    (questionLower.contains("format") || questionLower.contains("example") ||
+                            questionLower.contains("how")) -> {
+                """**📊 CSV Format Guide**
+
+**With Header (Recommended):**
+```csv
+feature_0,feature_1,feature_2
+0.5,1.2,3.4
+1.1,0.9,2.7
+```
+
+**Without Header:**
+```csv
+0.5,1.2,3.4
+1.1,0.9,2.7
+```
+→ Auto-generates: feature_0, feature_1...
+
+**Features:**
+✅ Auto header detection
+✅ Quoted values supported
+✅ Missing values handled
+✅ 100,000+ rows
+
+**Transfer:**
+```bash
+adb push data.csv /sdcard/Download/
+```
+
+**Excel Export:**
+File → Save As → CSV (Comma delimited)
+"""
+            }
+
+            // JSON format questions
+            (questionLower.contains("json") && (questionLower.contains("format") ||
+                    questionLower.contains("structure") || questionLower.contains("example"))) -> {
+                """**🔷 JSON Format Guide**
+
+**Format 1: Object with Array**
+```json
+{"data": [[0.5, 1.2], [1.1, 0.9]]}
+```
+
+**Format 2: Direct Array**
+```json
+[[0.5, 1.2], [1.1, 0.9]]
+```
+
+**Format 3: Named Features**
+```json
+[{"f0": 0.5, "f1": 1.2}]
+```
+
+**Python Export:**
+```python
+import json
+json.dump({"data": data}, open('data.json', 'w'))
+```
+
+**Transfer:**
+```bash
+adb push data.json /sdcard/Download/
+```
+"""
+            }
+
+            // Navigation/app usage
+            (questionLower.contains("how") || questionLower.contains("where")) &&
+                    (questionLower.contains("navigate") || questionLower.contains("find") ||
+                            questionLower.contains("use app")) -> {
+                """**🧭 App Navigation**
+
+**Bottom Navigation:**
+🏠 **Dashboard** - Drift overview
+📊 **Analytics** - Trends & charts
+📱 **Models** - Upload & manage
+🔧 **Patches** - Apply patches
+⚙️ **Settings** - Configure app
+
+**Quick Actions:**
+• Upload model: Models → + button
+• View drift: Dashboard → Tap card
+• Apply patch: Patches → Recommended
+• Export data: Model menu → Export
+
+**Questions?** Just ask!
+"""
+            }
+
+            // ===== DATA SCIENCE & ML CONCEPTS =====
+
+            // Overfitting
+            questionLower.contains("overfit") -> {
+                """**🎯 Overfitting**
+
+**What:** Model learns training data TOO well (including noise)
+
+**Signs:**
+• High train accuracy (99%)
+• Low test accuracy (65%)
+• Big gap = Overfitting!
+
+**Causes:**
+• Too complex model
+• Too many parameters
+• Insufficient data
+• Too many epochs
+
+**Solutions:**
+1. Get more data
+2. Use regularization (L1/L2, dropout)
+3. Simplify model
+4. Cross-validation
+5. Early stopping
+
+**In DriftGuardAI:**
+Drift might indicate model overfitting to old data patterns
+
+**Related:** "underfitting", "bias-variance"
+"""
+            }
+
+            // Underfitting
+            questionLower.contains("underfit") -> {
+                """**📉 Underfitting**
+
+**What:** Model TOO simple to capture patterns
+
+**Signs:**
+• Low train accuracy (65%)
+• Low test accuracy (62%)
+• Both low = Underfitting!
+
+**Solutions:**
+1. Increase model complexity
+2. Add more features
+3. Reduce regularization
+4. Train longer
+5. Better features
+
+**vs Overfitting:**
+• Underfit: Too simple, high bias
+• Overfit: Too complex, high variance
+
+**Related:** "bias-variance tradeoff"
+"""
+            }
+
+            // Bias-variance tradeoff
+            (questionLower.contains("bias") && questionLower.contains("variance")) ||
+                    questionLower.contains("tradeoff") -> {
+                """**⚖️ Bias-Variance Tradeoff**
+
+**Fundamental ML Concept:**
+Total Error = Bias² + Variance + Noise
+
+**Bias:** Error from wrong assumptions (underfit)
+**Variance:** Error from data sensitivity (overfit)
+
+**The Tradeoff:**
+• Simple model → High bias, Low variance
+• Complex model → Low bias, High variance
+• Sweet spot → Balanced!
+
+**Finding Balance:**
+→ Cross-validation
+→ Regularization
+→ Ensemble methods (Random Forest)
+
+**In DriftGuardAI:**
+Drift can shift the balance - model that fit well may now underfit
+"""
+            }
+
+            // Feature engineering
+            questionLower.contains("feature") && (questionLower.contains("engineering") ||
+                    questionLower.contains("selection") || questionLower.contains("extraction") ||
+                    questionLower.contains("transform")) -> {
+                """**🔧 Feature Engineering**
+
+**What:** Creating/transforming features to improve models
+
+**Types:**
+
+**1. Creation:**
+• Polynomial: x, x², x³
+• Interactions: age × income
+• Date/time: hour, day_of_week
+• Aggregations: user_avg_purchase
+
+**2. Transformation:**
+• Scaling: StandardScaler, MinMaxScaler
+• Log transform: for skewed data
+• Binning: continuous → categorical
+
+**3. Selection:**
+• Correlation analysis
+• Feature importance
+• Recursive elimination
+
+**4. Encoding:**
+• One-hot: categorical → binary
+• Label: ordinal → numeric
+• Target: category → mean(target)
+
+**Best Practices:**
+✓ Start simple
+✓ Avoid data leakage
+✓ Fit on train, transform test
+
+**In DriftGuardAI:**
+Feature drift shows which features are problematic
+"""
+            }
+
+            // Cross-validation
+            (questionLower.contains("cross") && questionLower.contains("validation")) ||
+                    questionLower.contains("k-fold") || questionLower.contains("cv") -> {
+                """**✅ Cross-Validation**
+
+**What:** Evaluate model on multiple data subsets
+
+**K-Fold (Most Common):**
+→ Split data into K folds (e.g., K=5)
+→ Train on K-1, test on 1
+→ Repeat K times
+→ Average results
+
+**Why:**
+• More reliable than single split
+• Uses all data for train & test
+• Detects overfitting
+
+**Types:**
+• K-Fold: Standard (K=5 or 10)
+• Stratified: Maintains class balance
+• Time Series: Respects time order
+• Leave-One-Out: K=n
+
+**Choosing K:**
+• K=5: Fast, good variance
+• K=10: Standard, balanced
+
+**Python:**
+```python
+from sklearn.model_selection import cross_val_score
+scores = cross_val_score(model, X, y, cv=5)
+```
+
+**In DriftGuardAI:**
+Use CV when retraining to ensure model generalizes
+"""
+            }
+
+            // Evaluation metrics
+            questionLower.contains("metric") || questionLower.contains("accuracy") ||
+                    questionLower.contains("precision") || questionLower.contains("recall") ||
+                    questionLower.contains("f1") || questionLower.contains("auc") -> {
+                """**📊 Model Evaluation Metrics**
+
+**Classification:**
+
+**Accuracy** = (TP+TN)/Total
+→ Overall correctness
+⚠️ Misleading for imbalanced data!
+
+**Precision** = TP/(TP+FP)
+→ "Of predicted positives, how many correct?"
+→ Minimize false alarms
+
+**Recall** = TP/(TP+FN)
+→ "Of actual positives, how many found?"
+→ Minimize missed cases
+
+**F1 Score** = 2×(Precision×Recall)/(Precision+Recall)
+→ Harmonic mean, balances both
+
+**ROC-AUC**
+→ Threshold-independent
+→ 1.0 = perfect, 0.5 = random
+
+**Regression:**
+
+**MAE** = Mean Absolute Error
+→ Average absolute difference
+
+**RMSE** = Root Mean Squared Error
+→ Penalizes large errors
+
+**R²** = Proportion of variance explained
+→ 1.0 = perfect, 0 = no better than mean
+
+**Choosing:**
+• Balanced data → Accuracy
+• Imbalanced → F1, AUC
+• Cost-sensitive → Precision or Recall
+
+**In DriftGuardAI:**
+Monitor these metrics over time to detect drift impact
+"""
+            }
+
+            // Ensemble methods
+            questionLower.contains("ensemble") || questionLower.contains("bagging") ||
+                    questionLower.contains("boosting") || questionLower.contains("random forest") ||
+                    questionLower.contains("xgboost") -> {
+                """**🌳 Ensemble Methods**
+
+**What:** Combine multiple models for better performance
+
+**Types:**
+
+**1. Bagging** (Bootstrap Aggregating)
+→ Train models on random subsets
+→ Average predictions
+→ Reduces variance
+**Example:** Random Forest
+
+**2. Boosting**
+→ Train models sequentially
+→ Focus on mistakes
+→ Reduces bias
+**Examples:** AdaBoost, XGBoost, LightGBM
+
+**3. Stacking**
+→ Train different models
+→ Meta-model combines them
+→ Best performance
+
+**When to Use:**
+• Random Forest: General purpose, fast
+• XGBoost: Maximum accuracy, competitions
+• Stacking: Squeeze last bit of performance
+
+**Benefits:**
+✓ Better than single model
+✓ Reduces overfitting
+✓ More stable predictions
+
+**In DriftGuardAI:**
+Ensemble patch strategy available - combines multiple approaches
+"""
+            }
+
+            // Hyperparameter tuning
+            (questionLower.contains("hyperparameter") || questionLower.contains("tuning") ||
+                    questionLower.contains("grid search") || questionLower.contains("optimization")) -> {
+                """**🎛️ Hyperparameter Tuning**
+
+**What:** Finding best settings BEFORE training
+
+**Examples:** learning_rate, n_estimators, max_depth
+
+**Methods:**
+
+**1. Grid Search** (Exhaustive)
+→ Try all combinations
+→ Slow but thorough
+
+**2. Random Search** (Faster)
+→ Try random combinations
+→ Often finds good params faster
+
+**3. Bayesian Optimization** (Smartest)
+→ Learns from previous trials
+→ Most efficient
+
+**Python:**
+```python
+from sklearn.model_selection import GridSearchCV
+GridSearchCV(model, param_grid, cv=5)
+```
+
+**Best Practices:**
+→ Start broad, refine
+→ Use cross-validation
+→ Log-scale for learning rates
+
+**In DriftGuardAI:**
+Tune patch parameters for best safety scores
+"""
+            }
+
+            // Neural networks
+            (questionLower.contains("neural network") || questionLower.contains("deep learning") ||
+                    questionLower.contains("nn") && !questionLower.contains("cnn")) -> {
+                """**🧠 Neural Networks**
+
+**What:** Layers of connected neurons that learn patterns
+
+**Architecture:**
+Input Layer → Hidden Layers → Output Layer
+
+**Components:**
+• **Neurons:** Process inputs
+• **Weights:** Learned importance
+• **Biases:** Shift outputs
+• **Activation:** Non-linearity (ReLU, sigmoid)
+
+**Training:**
+1. Forward propagation
+2. Calculate loss
+3. Backpropagation
+4. Update weights
+5. Repeat!
+
+**Activation Functions:**
+• ReLU: Most common, fast
+• Sigmoid: Binary output (0-1)
+• Softmax: Multi-class output
+
+**When to Use:**
+✓ Large datasets (>10K)
+✓ Complex patterns
+✓ Images, text, audio
+
+**Not Ideal:**
+❌ Small datasets
+❌ Need interpretability
+❌ Simple patterns (use XGBoost)
+
+**In DriftGuardAI:**
+Monitor NN drift - retraining often needed
+"""
+            }
+
             // ===== TECHNICAL QUESTIONS =====
 
             // Drift-related questions
@@ -525,7 +1034,7 @@ The KS test compares two probability distributions to determine if they differ s
 | **Output** | Score (0 to ∞) | Statistic + p-value |
 | **Threshold** | 0.2 for moderate drift | p < 0.05 for significance |
 | **Sensitivity** | More sensitive to shifts | More robust, less noisy |
-| **Use Case** | Real-time monitoring | Validation & confirmation |
+| **Use Case** | Real-time monitoring | Formal testing, validation |
 | **Speed** | Fast | Slightly slower |
 
 **When to use each:**
@@ -1407,3 +1916,4 @@ ${ if (safetyScore > 0.7) "🟢 High safety - Recommended for application"
         }
     }
 }
+

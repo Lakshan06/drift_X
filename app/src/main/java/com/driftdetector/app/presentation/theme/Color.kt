@@ -3,236 +3,232 @@ package com.driftdetector.app.presentation.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * DriftGuardAI Custom Color Palette
- * Sci-Fi / Fantasy Tech Theme
+ * DriftGuardAI Professional Color Palette
+ * Oceanic Theme - Calm, Professional, Status-Focused
  *
- * Designed for extended dashboard use with high contrast and accessibility
+ * Designed for clarity, user focus, and professional dashboard experience
  */
 
 // ========================================
-// PRIMARY COLORS - Sci-Fi Theme
+// PRIMARY COLORS - Professional Oceanic Theme
 // ========================================
 
-/** Main background color - Deep space feel */
-val GalaxyCharcoal = Color(0xFF181B24)
+/** Primary brand color - Oceanic Teal for buttons, highlights */
+val OceanicTeal = Color(0xFF2C8C99)
 
-/** Primary brand color - Used for CTAs, headers */
-val CyberIndigo = Color(0xFF233DFF)
+/** Accent color - Coral Blush for secondary interactive elements */
+val CoralBlush = Color(0xFFFF6F61)
 
-/** Secondary brand color - Navigation, active states */
-val MysticViolet = Color(0xFF725AC1)
+/** Main background - Slate Gray for background and dash panels */
+val SlateGray = Color(0xFF2F3B45)
 
-/** Card backgrounds - General purpose */
-val DeepSpaceNavy = Color(0xFF232535)
-
-/** Alternative card background - Lists, data entry */
-val CosmicGraphite = Color(0xFF23272D)
-
-// ========================================
-// TEXT COLORS
-// ========================================
-
-/** Primary text color - High contrast white */
-val StardustWhite = Color(0xFFDEE5EF)
-
-/** Secondary text - Stats, labels */
-val LapisSilver = Color(0xFFB6BBC4)
-
-/** Disabled/inactive text and elements */
-val EclipseSlate = Color(0xFF626A77)
+/** Card backgrounds - Gunmetal for cards and grouping areas */
+val Gunmetal = Color(0xFF393E46)
 
 // ========================================
 // STATUS & ALERT COLORS
 // ========================================
 
-/** Warning state - Moderate drift */
-val SolarAmber = Color(0xFFFFA600)
+/** Success - Mint Green for success and applied patches */
+val MintGreen = Color(0xFF3EB489)
 
-/** Critical/Error state - High drift, failures */
-val HyperCrimson = Color(0xFFD72660)
+/** Warning - Goldenrod for drift warnings */
+val Goldenrod = Color(0xFFE9B44C)
 
-/** Success state - Patches applied, healthy models */
-val EmeraldFade = Color(0xFF44D39A)
+/** Error - Flame Red for error indicators */
+val FlameRed = Color(0xFFD7263D)
 
 // ========================================
-// LIGHT THEME COLORS
+// TEXT COLORS
 // ========================================
-// Inverted palette for light mode (optional)
 
-val LightBackground = Color(0xFFF5F7FA)
-val LightSurface = Color(0xFFFFFFFF)
-val LightPrimary = CyberIndigo
-val LightOnPrimary = StardustWhite
-val LightSecondary = MysticViolet
-val LightOnBackground = Color(0xFF1A1C23)
-val LightOnSurface = Color(0xFF1A1C23)
+/** Primary text - Ivory for high contrast against dark tones */
+val Ivory = Color(0xFFF4F1DE)
+
+/** Secondary text - Mist Gray for secondary text and charts */
+val MistGray = Color(0xFFB0B3B8)
+
+/** Disabled/inactive text */
+val DisabledGray = Color(0xFF6B7280)
 
 // ========================================
 // DARK THEME COLORS (Primary)
 // ========================================
 
 // Background
-val DarkBackground = GalaxyCharcoal
-val DarkSurface = DeepSpaceNavy
-val DarkSurfaceVariant = CosmicGraphite
+val DarkBackground = SlateGray
+val DarkSurface = Gunmetal
+val DarkSurfaceVariant = Color(0xFF434952) // Lighter Gunmetal
 
-// Primary colors
-val DarkPrimary = CyberIndigo
-val DarkOnPrimary = StardustWhite
-val DarkPrimaryContainer = MysticViolet
-val DarkOnPrimaryContainer = StardustWhite
+// Primary colors - Oceanic Teal
+val DarkPrimary = OceanicTeal
+val DarkOnPrimary = Ivory
+val DarkPrimaryContainer = Color(0xFF236B76) // Darker Teal
+val DarkOnPrimaryContainer = Ivory
 
-// Secondary colors
-val DarkSecondary = MysticViolet
-val DarkOnSecondary = StardustWhite
-val DarkSecondaryContainer = Color(0xFF4A3F7E) // Darker violet
-val DarkOnSecondaryContainer = StardustWhite
+// Secondary colors - Coral Blush
+val DarkSecondary = CoralBlush
+val DarkOnSecondary = Ivory
+val DarkSecondaryContainer = Color(0xFFCC5850) // Darker Coral
+val DarkOnSecondaryContainer = Ivory
 
-// Tertiary colors (for additional accents)
-val DarkTertiary = EmeraldFade
-val DarkOnTertiary = GalaxyCharcoal
-val DarkTertiaryContainer = Color(0xFF2A8A61) // Darker emerald
-val DarkOnTertiaryContainer = StardustWhite
+// Tertiary colors - Mint Green
+val DarkTertiary = MintGreen
+val DarkOnTertiary = SlateGray
+val DarkTertiaryContainer = Color(0xFF2E8A68) // Darker Mint
+val DarkOnTertiaryContainer = Ivory
 
-// Error colors
-val DarkError = HyperCrimson
-val DarkOnError = StardustWhite
-val DarkErrorContainer = Color(0xFF8A1942) // Darker crimson
-val DarkOnErrorContainer = StardustWhite
+// Error colors - Flame Red
+val DarkError = FlameRed
+val DarkOnError = Ivory
+val DarkErrorContainer = Color(0xFF9A1C2A) // Darker Red
+val DarkOnErrorContainer = Ivory
 
 // Text colors
-val DarkOnBackground = StardustWhite
-val DarkOnSurface = StardustWhite
-val DarkOnSurfaceVariant = LapisSilver
+val DarkOnBackground = Ivory
+val DarkOnSurface = Ivory
+val DarkOnSurfaceVariant = MistGray
 
 // Border and outline
-val DarkOutline = EclipseSlate
-val DarkOutlineVariant = Color(0xFF3D4452) // Lighter slate
+val DarkOutline = MistGray
+val DarkOutlineVariant = Color(0xFF5A6169) // Lighter gray
+
+// ========================================
+// LIGHT THEME COLORS
+// ========================================
+
+val LightBackground = Color(0xFFF5F7FA)
+val LightSurface = Color(0xFFFFFFFF)
+val LightPrimary = OceanicTeal
+val LightOnPrimary = Ivory
+val LightSecondary = CoralBlush
+val LightOnBackground = Color(0xFF1F2937)
+val LightOnSurface = Color(0xFF1F2937)
 
 // ========================================
 // CHART & VISUALIZATION COLORS
 // ========================================
 
-/** Chart series colors - for multi-line charts */
-val ChartSeries1 = CyberIndigo
-val ChartSeries2 = MysticViolet
-val ChartSeries3 = EmeraldFade
-val ChartSeries4 = SolarAmber
+/** Chart series colors */
+val ChartSeries1 = OceanicTeal
+val ChartSeries2 = CoralBlush
+val ChartSeries3 = MintGreen
+val ChartSeries4 = Goldenrod
 
 /** Heatmap gradient - Low to High drift impact */
-val HeatmapLow = EmeraldFade      // Light green
-val HeatmapMedium = SolarAmber    // Orange
-val HeatmapHigh = HyperCrimson    // Red
+val HeatmapLow = MintGreen       // Mint green
+val HeatmapMedium = Goldenrod    // Goldenrod
+val HeatmapHigh = FlameRed       // Flame red
 
 /** Chart background */
-val ChartBackground = CosmicGraphite
+val ChartBackground = Gunmetal
 
 // ========================================
 // COMPONENT SPECIFIC COLORS
 // ========================================
 
 /** FAB (Floating Action Button) - PatchBot */
-val FABBackground = MysticViolet
-val FABContent = StardustWhite
+val FABBackground = CoralBlush
+val FABContent = Ivory
 
 /** Navigation Bar */
-val NavBarBackground = CyberIndigo
-val NavBarSelected = MysticViolet
-val NavBarUnselected = LapisSilver
+val NavBarBackground = Gunmetal
+val NavBarSelected = OceanicTeal
+val NavBarUnselected = MistGray
 
 /** Cards */
-val CardBackground = DeepSpaceNavy
-val CardBorder = MysticViolet
-val CardBorderInactive = EclipseSlate
+val CardBackground = Gunmetal
+val CardBorder = OceanicTeal
+val CardBorderInactive = DisabledGray
 
 /** Buttons */
-val ButtonPrimary = CyberIndigo
-val ButtonPrimaryText = StardustWhite
-val ButtonSecondary = MysticViolet
-val ButtonSecondaryText = StardustWhite
-val ButtonSuccess = EmeraldFade
-val ButtonSuccessText = GalaxyCharcoal
-val ButtonDanger = HyperCrimson
-val ButtonDangerText = StardustWhite
-val ButtonDisabled = EclipseSlate
-val ButtonDisabledText = Color(0xFF4A4F5C)
+val ButtonPrimary = OceanicTeal
+val ButtonPrimaryText = Ivory
+val ButtonSecondary = CoralBlush
+val ButtonSecondaryText = Ivory
+val ButtonSuccess = MintGreen
+val ButtonSuccessText = SlateGray
+val ButtonDanger = FlameRed
+val ButtonDangerText = Ivory
+val ButtonDisabled = DisabledGray
+val ButtonDisabledText = Color(0xFF9CA3AF)
 
 /** Alerts & Notifications */
-val AlertWarningBackground = SolarAmber
-val AlertWarningText = GalaxyCharcoal
-val AlertCriticalBackground = HyperCrimson
-val AlertCriticalText = StardustWhite
-val AlertSuccessBackground = EmeraldFade
-val AlertSuccessText = GalaxyCharcoal
-val AlertInfoBackground = CyberIndigo
-val AlertInfoText = StardustWhite
+val AlertWarningBackground = Goldenrod
+val AlertWarningText = SlateGray
+val AlertCriticalBackground = FlameRed
+val AlertCriticalText = Ivory
+val AlertSuccessBackground = MintGreen
+val AlertSuccessText = SlateGray
+val AlertInfoBackground = OceanicTeal
+val AlertInfoText = Ivory
 
 /** Badges */
-val BadgeActive = EmeraldFade
-val BadgeWarning = SolarAmber
-val BadgeCritical = HyperCrimson
-val BadgeInactive = EclipseSlate
-val BadgeInfo = CyberIndigo
+val BadgeActive = MintGreen
+val BadgeWarning = Goldenrod
+val BadgeCritical = FlameRed
+val BadgeInactive = DisabledGray
+val BadgeInfo = OceanicTeal
 
 /** Dividers */
-val DividerColor = Color(0xFF2D3139)
-val DividerColorSubtle = Color(0xFF252830)
+val DividerColor = Color(0xFF4B5563)
+val DividerColorSubtle = Color(0xFF374151)
 
 /** Ripple effect */
-val RippleColor = Color(0x33233DFF) // 20% opacity Cyber Indigo
+val RippleColor = Color(0x332C8C99) // 20% opacity Oceanic Teal
 
 /** Shimmer/Loading effect */
-val ShimmerBase = CosmicGraphite
-val ShimmerHighlight = Color(0xFF2F3340)
+val ShimmerBase = Gunmetal
+val ShimmerHighlight = Color(0xFF4A5260)
 
 // ========================================
 // DRIFT SEVERITY COLORS
 // ========================================
 
 /** No drift detected */
-val DriftNone = EmeraldFade
+val DriftNone = MintGreen
 
 /** Low drift (PSI < 0.2) */
-val DriftLow = Color(0xFF67E0A8) // Lighter emerald
+val DriftLow = Color(0xFF5BC999) // Lighter mint
 
 /** Moderate drift (PSI 0.2-0.5) */
-val DriftModerate = SolarAmber
+val DriftModerate = Goldenrod
 
 /** High drift (PSI 0.5-0.7) */
-val DriftHigh = Color(0xFFFF8F39) // Orange-red
+val DriftHigh = Color(0xFFEF8A5C) // Orange-coral
 
 /** Critical drift (PSI > 0.7) */
-val DriftCritical = HyperCrimson
+val DriftCritical = FlameRed
 
 // ========================================
 // LEGACY COMPATIBILITY
-// (Kept for backward compatibility, can be removed later)
+// (Kept for backward compatibility)
 // ========================================
 
 // Light Theme Legacy
-val md_theme_light_primary = CyberIndigo
-val md_theme_light_onPrimary = StardustWhite
-val md_theme_light_primaryContainer = MysticViolet
-val md_theme_light_onPrimaryContainer = StardustWhite
-val md_theme_light_secondary = MysticViolet
-val md_theme_light_onSecondary = StardustWhite
-val md_theme_light_secondaryContainer = Color(0xFFE8DEF8)
-val md_theme_light_onSecondaryContainer = GalaxyCharcoal
-val md_theme_light_tertiary = EmeraldFade
-val md_theme_light_onTertiary = GalaxyCharcoal
-val md_theme_light_tertiaryContainer = Color(0xFFD0F4E4)
-val md_theme_light_onTertiaryContainer = GalaxyCharcoal
-val md_theme_light_error = HyperCrimson
+val md_theme_light_primary = OceanicTeal
+val md_theme_light_onPrimary = Ivory
+val md_theme_light_primaryContainer = Color(0xFFB3E5EC)
+val md_theme_light_onPrimaryContainer = SlateGray
+val md_theme_light_secondary = CoralBlush
+val md_theme_light_onSecondary = Ivory
+val md_theme_light_secondaryContainer = Color(0xFFFFDBD7)
+val md_theme_light_onSecondaryContainer = SlateGray
+val md_theme_light_tertiary = MintGreen
+val md_theme_light_onTertiary = SlateGray
+val md_theme_light_tertiaryContainer = Color(0xFFB8F4D7)
+val md_theme_light_onTertiaryContainer = SlateGray
+val md_theme_light_error = FlameRed
 val md_theme_light_errorContainer = Color(0xFFF9DEDC)
-val md_theme_light_onError = StardustWhite
-val md_theme_light_onErrorContainer = GalaxyCharcoal
+val md_theme_light_onError = Ivory
+val md_theme_light_onErrorContainer = SlateGray
 val md_theme_light_background = LightBackground
 val md_theme_light_onBackground = LightOnBackground
 val md_theme_light_surface = LightSurface
 val md_theme_light_onSurface = LightOnSurface
-val md_theme_light_surfaceVariant = Color(0xFFE7E0EC)
-val md_theme_light_onSurfaceVariant = Color(0xFF49454F)
-val md_theme_light_outline = EclipseSlate
+val md_theme_light_surfaceVariant = Color(0xFFE7E9EB)
+val md_theme_light_onSurfaceVariant = Color(0xFF4B5563)
+val md_theme_light_outline = MistGray
 
 // Dark Theme Legacy
 val md_theme_dark_primary = DarkPrimary
@@ -258,3 +254,21 @@ val md_theme_dark_onSurface = DarkOnSurface
 val md_theme_dark_surfaceVariant = DarkSurfaceVariant
 val md_theme_dark_onSurfaceVariant = DarkOnSurfaceVariant
 val md_theme_dark_outline = DarkOutline
+
+// ========================================
+// BACKWARD COMPATIBILITY ALIASES
+// (For existing code that references old names)
+// ========================================
+
+// Map old names to new palette
+val CyberIndigo = OceanicTeal
+val MysticViolet = CoralBlush
+val GalaxyCharcoal = SlateGray
+val DeepSpaceNavy = Gunmetal
+val CosmicGraphite = Gunmetal
+val StardustWhite = Ivory
+val LapisSilver = MistGray
+val EclipseSlate = DisabledGray
+val SolarAmber = Goldenrod
+val HyperCrimson = FlameRed
+val EmeraldFade = MintGreen

@@ -137,13 +137,18 @@ fun ModelUploadScreen(
             
             // Processing Results
             uiState.processedModel?.let { model ->
-                uiState.detectedDrift?.let { driftResult ->
-                    item {
+                item {
+                    val driftResult = uiState.detectedDrift
+                    if (driftResult != null) {
+                        // Show full processing results with drift detection
                         ProcessingResultsCard(
                             model = model,
                             driftResult = driftResult,
                             patch = uiState.synthesizedPatch
                         )
+                    } else {
+                        // Show model registration success card
+                        ModelRegisteredCard(model = model)
                     }
                 }
             }
@@ -377,13 +382,13 @@ fun LocalFileUploadSection(
     onFilesSelected: (List<Uri>) -> Unit
 ) {
     val modelLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let { onFilesSelected(listOf(it)) }
     }
     
     val dataLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let { onFilesSelected(listOf(it)) }
     }
@@ -404,9 +409,34 @@ fun LocalFileUploadSection(
                 fontWeight = FontWeight.SemiBold
             )
             
-            // Model File Button
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.CloudDone,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        "Works offline! Access previously synced Google Drive files without internet",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            
             OutlinedButton(
-                onClick = { modelLauncher.launch("*/*") },
+                onClick = { 
+                    modelLauncher.launch(arrayOf("*/*"))
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.Memory, contentDescription = null)
@@ -414,9 +444,10 @@ fun LocalFileUploadSection(
                 Text("Upload ML Model (.tflite, .onnx)")
             }
             
-            // Data File Button
             OutlinedButton(
-                onClick = { dataLauncher.launch("*/*") },
+                onClick = { 
+                    dataLauncher.launch(arrayOf("*/*"))
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.TableChart, contentDescription = null)
@@ -572,9 +603,9 @@ fun DragDropSection(
         label = "alpha"
     )
 
-    // File picker launcher for drag & drop fallback
+    // Use OpenMultipleDocuments for better offline support (Google Drive)
     val fileLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents()
+        contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
         if (uris.isNotEmpty()) {
             onFilesDropped(uris)
@@ -582,7 +613,10 @@ fun DragDropSection(
     }
 
     Card(
-        onClick = { fileLauncher.launch("*/*") },
+        onClick = {
+            // Open documents with all file types, allowing offline access
+            fileLauncher.launch(arrayOf("*/*"))
+        },
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 200.dp)
@@ -633,7 +667,7 @@ fun DragDropSection(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 FilledTonalButton(
-                    onClick = { fileLauncher.launch("*/*") }
+                    onClick = { fileLauncher.launch(arrayOf("*/*")) }
                 ) {
                     Icon(Icons.Default.FolderOpen, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
@@ -1199,6 +1233,132 @@ fun ProcessingResultsCard(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun ModelRegisteredCard(model: MLModel) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+                
+                Column {
+                    Text(
+                        "Model Registered Successfully",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        model.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            
+            // Model Information
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Model Information",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                
+                ResultRow(
+                    label = "Version",
+                    value = model.version
+                )
+                
+                ResultRow(
+                    label = "Input Features",
+                    value = "${model.inputFeatures.size} features"
+                )
+                
+                ResultRow(
+                    label = "Output Classes",
+                    value = "${model.outputLabels.size} classes"
+                )
+                
+                ResultRow(
+                    label = "Status",
+                    value = if (model.isActive) "✅ Active" else "❌ Inactive",
+                    valueColor = if (model.isActive) 
+                        MaterialTheme.colorScheme.primary 
+                    else 
+                        MaterialTheme.colorScheme.error
+                )
+            }
+            
+            Divider()
+            
+            // Next Steps
+            Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            "Next Steps",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    
+                    Text(
+                        "1. Upload a dataset (.csv, .json, .parquet)",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        "2. System will automatically detect drift",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        "3. Patches will be generated if drift is detected",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+            
+            // Action Button
+            Button(
+                onClick = { /* Will be handled by navigation */ },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Dashboard, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Go to Dashboard")
             }
         }
     }

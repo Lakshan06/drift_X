@@ -9,10 +9,25 @@
     <!-- Permission for WorkManager background tasks -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- Optional: For storing models in external storage -->
+    <!-- Storage permissions for different Android versions -->
+    <!-- For Android 12 and below (API 32 and below) -->
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29"
+        tools:ignore="ScopedStorage" />
+
+    <!-- For Android 13+ (API 33+) - Granular media permissions -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+
+    <!-- Optional: For full storage access (requires user approval in settings) -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
 
     <!-- Optional: POST_NOTIFICATIONS permission for Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

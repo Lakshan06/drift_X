@@ -4,16 +4,23 @@ import android.content.Context
 import android.util.Log
 import androidx.room.Room
 import com.driftdetector.app.core.ai.AIAnalysisEngine
+import com.driftdetector.app.core.auth.AuthManager
 import com.driftdetector.app.core.cloud.CloudStorageManager
+import com.driftdetector.app.core.connectivity.NetworkConnectivityManager
 import com.driftdetector.app.core.drift.AttributionEngine
 import com.driftdetector.app.core.drift.DriftDetector
 import com.driftdetector.app.core.export.ModelExportManager
 import com.driftdetector.app.core.ml.ModelMetadataExtractor
 import com.driftdetector.app.core.ml.TFLiteModelInference
 import com.driftdetector.app.core.monitoring.ModelMonitoringService
+import com.driftdetector.app.core.notifications.DriftNotificationManager
 import com.driftdetector.app.core.patch.PatchEngine
 import com.driftdetector.app.core.patch.PatchSynthesizer
 import com.driftdetector.app.core.patch.PatchValidator
+import com.driftdetector.app.core.patch.IntelligentPatchGenerator
+import com.driftdetector.app.core.patch.UltraAggressivePatchGenerator
+import com.driftdetector.app.core.backup.AutomaticBackupManager
+import com.driftdetector.app.core.realtime.RealtimeClient
 import com.driftdetector.app.core.security.DifferentialPrivacy
 import com.driftdetector.app.core.security.EncryptionManager
 import com.driftdetector.app.core.upload.FileUploadProcessor
@@ -309,6 +316,16 @@ val coreModule = module {
         }
     }
 
+    single {
+        Log.d("KOIN", "Creating IntelligentPatchGenerator...")
+        try {
+            IntelligentPatchGenerator()
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ IntelligentPatchGenerator creation FAILED", e)
+            throw e
+        }
+    }
+
     // File Upload Processor
     single {
         try {
@@ -364,6 +381,83 @@ val coreModule = module {
             throw e
         }
     }
+    
+    // Real-time Monitoring Components
+    single {
+        try {
+            Log.d("KOIN", "Creating AuthManager...")
+            val authManager = AuthManager(
+                context = androidContext(),
+                gson = get()
+            )
+            Log.d("KOIN", "✓ AuthManager created")
+            authManager
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ AuthManager creation FAILED", e)
+            throw e
+        }
+    }
+
+    single {
+        try {
+            Log.d("KOIN", "Creating NetworkConnectivityManager...")
+            val connectivityManager = NetworkConnectivityManager(
+                context = androidContext()
+            )
+            Log.d("KOIN", "✓ NetworkConnectivityManager created")
+            connectivityManager
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ NetworkConnectivityManager creation FAILED", e)
+            throw e
+        }
+    }
+
+    single {
+        try {
+            Log.d("KOIN", "Creating DriftNotificationManager...")
+            val notificationManager = DriftNotificationManager(
+                context = androidContext()
+            )
+            Log.d("KOIN", "✓ DriftNotificationManager created")
+            notificationManager
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ DriftNotificationManager creation FAILED", e)
+            throw e
+        }
+    }
+
+    single {
+        try {
+            Log.d("KOIN", "Creating RealtimeClient...")
+            // Default server URL - can be configured via settings
+            val serverUrl = "wss://api.driftdetector.example.com/realtime"
+            val realtimeClient = RealtimeClient(
+                serverUrl = serverUrl,
+                authToken = null, // Will be set after authentication
+                gson = get()
+            )
+            Log.d("KOIN", "✓ RealtimeClient created")
+            realtimeClient
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ RealtimeClient creation FAILED", e)
+            throw e
+        }
+    }
+
+    single {
+        try {
+            Log.d("KOIN", "Creating AutomaticBackupManager...")
+            val backupManager = AutomaticBackupManager(
+                context = androidContext(),
+                repository = get()
+            )
+            Log.d("KOIN", "✓ AutomaticBackupManager created")
+            backupManager
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ AutomaticBackupManager creation FAILED", e)
+            throw e
+        }
+    }
 }
 
 val repositoryModule = module {
@@ -399,7 +493,7 @@ val viewModelModule = module {
     viewModel {
         try {
             Log.d("KOIN", "Creating DriftDashboardViewModel...")
-            DriftDashboardViewModel(get())
+            DriftDashboardViewModel(get(), get())
         } catch (e: Exception) {
             Log.e("KOIN", "✗ DriftDashboardViewModel creation FAILED", e)
             throw e

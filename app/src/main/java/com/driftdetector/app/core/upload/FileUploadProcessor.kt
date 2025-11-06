@@ -2,6 +2,7 @@ package com.driftdetector.app.core.upload
 
 import android.content.Context
 import android.net.Uri
+import com.driftdetector.app.core.data.DataFileParser
 import com.driftdetector.app.core.ml.ModelMetadataExtractor
 import com.driftdetector.app.data.repository.DriftRepository
 import com.driftdetector.app.domain.model.*
@@ -23,6 +24,8 @@ class FileUploadProcessor(
     private val repository: DriftRepository,
     private val metadataExtractor: ModelMetadataExtractor
 ) {
+    
+    private val dataParser = DataFileParser(context)
     
     /**
      * Process uploaded model file
@@ -78,26 +81,41 @@ class FileUploadProcessor(
         modelId: String
     ): Result<ProcessingResult> = withContext(Dispatchers.IO) {
         try {
-            Timber.d(" Processing data file: $fileName")
+            Timber.d("📊 Processing data file: $fileName")
             
             // Get model
             val model = repository.getModelById(modelId)
                 ?: return@withContext Result.failure(Exception("Model not found"))
-            
-            // Parse data file
-            val data = parseDataFile(uri, fileName, model.inputFeatures.size)
-            
+
+            // Use enhanced parser that supports all formats
+            val parseResult = dataParser.parseFile(uri, fileName, model.inputFeatures.size)
+
+            if (parseResult.isFailure) {
+                return@withContext Result.failure(
+                    parseResult.exceptionOrNull() ?: Exception("Failed to parse data file")
+                )
+            }
+
+            val data = parseResult.getOrThrow()
+
             if (data.isEmpty()) {
                 return@withContext Result.failure(Exception("No data found in file"))
             }
-            
-            Timber.d(" Parsed ${data.size} data points")
-            
+
+            Timber.i("✅ Parsed ${data.size} data points with ${data.first().size} features")
+
+            // Get file statistics for logging
+            dataParser.getFileStats(uri)?.let { stats ->
+                Timber.d("📊 File stats: ${stats.totalRows} rows, ${stats.totalColumns} columns, header: ${stats.hasHeader}")
+            }
+
             // Split data into reference and current (for drift detection)
             val splitIndex = (data.size * 0.7).toInt()
             val referenceData = data.take(splitIndex)
             val currentData = data.drop(splitIndex)
-            
+
+            Timber.d("📊 Split data: ${referenceData.size} reference, ${currentData.size} current")
+
             // Detect drift
             val driftResult = repository.detectDrift(
                 modelId = modelId,
@@ -111,7 +129,7 @@ class FileUploadProcessor(
             // If drift detected, synthesize patch
             var patch: Patch? = null
             if (driftResult.isDriftDetected && driftResult.driftScore > 0.3) {
-                Timber.d(" Synthesizing patch for detected drift...")
+                Timber.d("🔧 Synthesizing patch for detected drift...")
                 
                 patch = repository.synthesizePatch(
                     modelId = modelId,
@@ -148,7 +166,7 @@ class FileUploadProcessor(
         dataFileName: String
     ): Result<ProcessingResult> = withContext(Dispatchers.IO) {
         try {
-            Timber.d(" Processing model and data files together")
+            Timber.d("📦 Processing model and data files together")
             
             // Process model first
             val modelResult = processModelFile(modelUri, modelFileName)
@@ -253,91 +271,6 @@ class FileUploadProcessor(
                     outputLabels = listOf("class_0", "class_1"),
                     framework = "Unknown"
                 )
-            }
-        }
-    }
-    
-    /**
-     * Parse data from CSV/JSON/Parquet file
-     */
-    private fun parseDataFile(uri: Uri, fileName: String, expectedFeatures: Int): List<FloatArray> {
-        Timber.d("Parsing data file: $fileName")
-        
-        return when {
-            fileName.endsWith(".csv") -> parseCSV(uri, expectedFeatures)
-            fileName.endsWith(".json") -> parseJSON(uri, expectedFeatures)
-            else -> {
-                Timber.w("Unsupported format, generating sample data")
-                generateSampleData(100, expectedFeatures)
-            }
-        }
-    }
-    
-    /**
-     * Parse CSV file
-     */
-    private fun parseCSV(uri: Uri, expectedFeatures: Int): List<FloatArray> {
-        val data = mutableListOf<FloatArray>()
-        
-        try {
-            context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                BufferedReader(InputStreamReader(inputStream)).use { reader ->
-                    // Skip header if present
-                    var line = reader.readLine()
-                    
-                    // Check if first line is header (contains non-numeric characters)
-                    if (line?.any { it.isLetter() } == true) {
-                        line = reader.readLine()
-                    }
-                    
-                    // Parse data rows
-                    while (line != null) {
-                        try {
-                            val values = line.split(",")
-                                .take(expectedFeatures)
-                                .map { it.trim().toFloat() }
-                            
-                            if (values.size == expectedFeatures) {
-                                data.add(values.toFloatArray())
-                            }
-                        } catch (e: Exception) {
-                            Timber.w("Skipping invalid row: $line")
-                        }
-                        
-                        line = reader.readLine()
-                    }
-                }
-            }
-            
-            Timber.d("✅ Parsed ${data.size} rows from CSV")
-            
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to parse CSV, generating sample data")
-            return generateSampleData(100, expectedFeatures)
-        }
-        
-        return if (data.isNotEmpty()) data else generateSampleData(100, expectedFeatures)
-    }
-    
-    /**
-     * Parse JSON file (simplified)
-     */
-    private fun parseJSON(uri: Uri, expectedFeatures: Int): List<FloatArray> {
-        // For now, generate sample data
-        // TODO: Implement actual JSON parsing
-        Timber.d("JSON parsing not fully implemented, generating sample data")
-        return generateSampleData(100, expectedFeatures)
-    }
-    
-    /**
-     * Generate sample data for testing
-     */
-    private fun generateSampleData(numSamples: Int, numFeatures: Int): List<FloatArray> {
-        Timber.d("Generating $numSamples sample data points")
-        
-        return List(numSamples) {
-            FloatArray(numFeatures) {
-                Random.nextFloat() * 10f
             }
         }
     }
