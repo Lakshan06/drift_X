@@ -5,22 +5,36 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.driftdetector.app.R
 import com.driftdetector.app.presentation.screen.AIAssistantScreen
 import com.driftdetector.app.presentation.screen.DriftDashboardScreen
+import com.driftdetector.app.presentation.screen.InstantDriftFixScreen
 import com.driftdetector.app.presentation.screen.ModelManagementScreen
 import com.driftdetector.app.presentation.screen.ModelUploadScreen
 import com.driftdetector.app.presentation.screen.PatchManagementScreen
@@ -208,11 +222,26 @@ fun DriftDetectorApp() {
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        "DriftGuardAI",
-                        fontWeight = FontWeight.ExtraBold,
-                        style = MaterialTheme.typography.titleLarge
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // App Logo - Using the actual launcher icon with circular clip
+                        Image(
+                            painter = painterResource(id = R.mipmap.ic_launcher_foreground),
+                            contentDescription = "DriftGuard Logo",
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.1f), CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        // App Title
+                        Text(
+                            "DriftGuardAI",
+                            fontWeight = FontWeight.ExtraBold,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -267,12 +296,19 @@ fun DriftDetectorApp() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Dashboard.route) {
-                DriftDashboardScreen()
+                DriftDashboardScreen(
+                    onNavigateToInstantDriftFix = {
+                        navController.navigate(Screen.InstantDriftFix.route)
+                    }
+                )
             }
             composable(Screen.Models.route) {
                 ModelManagementScreen(
                     onNavigateToUpload = {
                         navController.navigate(Screen.ModelUpload.route)
+                    },
+                    onNavigateToInstantDriftFix = {
+                        navController.navigate(Screen.InstantDriftFix.route)
                     }
                 )
             }
@@ -296,6 +332,13 @@ fun DriftDetectorApp() {
                     }
                 )
             }
+            composable(Screen.InstantDriftFix.route) {
+                InstantDriftFixScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
         }
     }
 }
@@ -311,4 +354,5 @@ sealed class Screen(
     object Patches : Screen("patches", "Patches", Icons.Filled.Build)
     object Settings : Screen("settings", "Settings", Icons.Filled.Settings)
     object AIAssistant : Screen("ai_assistant", "PatchBot", Icons.Filled.Psychology)
+    object InstantDriftFix : Screen("instant_drift_fix", "Instant Drift Fix", Icons.Filled.Speed)
 }

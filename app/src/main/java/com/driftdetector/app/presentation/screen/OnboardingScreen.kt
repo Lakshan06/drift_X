@@ -148,7 +148,7 @@ fun OnboardingScreen(
                             Icons.Default.ArrowForward
                         else
                             Icons.Default.CheckCircle,
-                        contentDescription = null
+                        contentDescription = if (pagerState.currentPage < pages.size - 1) "Next page" else "Complete onboarding"
                     )
                 }
             }
@@ -191,7 +191,7 @@ fun OnboardingPageContent(page: OnboardingPage) {
             ) {
                 Icon(
                     imageVector = page.icon,
-                    contentDescription = null,
+                    contentDescription = "${page.title} icon",
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer(scaleX = scale, scaleY = scale),
@@ -255,7 +255,7 @@ fun FeatureRow(feature: String) {
     ) {
         Icon(
             imageVector = Icons.Default.CheckCircle,
-            contentDescription = null,
+            contentDescription = "Feature available",
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(20.dp)
         )

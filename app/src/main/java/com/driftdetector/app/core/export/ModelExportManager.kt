@@ -3,6 +3,7 @@ package com.driftdetector.app.core.export
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Environment
 import androidx.core.content.FileProvider
 import com.driftdetector.app.domain.model.*
 import com.opencsv.CSVWriter
@@ -23,6 +24,47 @@ class ModelExportManager(private val context: Context) {
 
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US)
 
+    companion object {
+        private const val EXPORT_DIR = "DriftGuard/Data"
+    }
+
+    /**
+     * Get user-accessible export directory (Downloads/DriftGuard/Data)
+     */
+    private fun getExportDir(): File {
+        val downloadsDir = Environment.getExternalStoragePublicDirectory(
+            Environment.DIRECTORY_DOWNLOADS
+        )
+        val dir = File(downloadsDir, EXPORT_DIR)
+        if (!dir.exists()) {
+            val created = dir.mkdirs()
+            Timber.d("📁 Created export directory: ${dir.absolutePath} (success: $created)")
+        }
+
+        // Verify directory is writable
+        if (!dir.canWrite()) {
+            Timber.e("❌ Export directory is not writable: ${dir.absolutePath}")
+        } else {
+            Timber.d("✅ Export directory is writable: ${dir.absolutePath}")
+        }
+
+        return dir
+    }
+
+    /**
+     * Notify media scanner about new file so it appears in file browsers immediately
+     */
+    private fun notifyMediaScanner(file: File) {
+        try {
+            val intent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+            intent.data = Uri.fromFile(file)
+            context.sendBroadcast(intent)
+            Timber.d("📢 Notified media scanner about: ${file.name}")
+        } catch (e: Exception) {
+            Timber.w(e, "Failed to notify media scanner")
+        }
+    }
+
     /**
      * Export model predictions to CSV
      */
@@ -34,7 +76,9 @@ class ModelExportManager(private val context: Context) {
         try {
             val timestamp = dateFormat.format(Date())
             val fileName = "predictions_${modelName}_$timestamp.csv"
-            val file = File(context.getExternalFilesDir(null), fileName)
+            val file = File(getExportDir(), fileName)
+
+            Timber.d("📝 Writing predictions to: ${file.absolutePath}")
 
             CSVWriter(FileWriter(file)).use { writer ->
                 // Write header
@@ -66,8 +110,20 @@ class ModelExportManager(private val context: Context) {
                 }
             }
 
-            Timber.i("✅ Exported ${predictions.size} predictions to CSV: $fileName")
-            Result.success(ExportResult(file, ExportFormat.CSV, predictions.size))
+            // Verify file was created
+            if (file.exists() && file.length() > 0) {
+                // Notify media scanner so file appears immediately
+                notifyMediaScanner(file)
+
+                Timber.i("✅ Exported ${predictions.size} predictions to CSV: $fileName")
+                Timber.i("   📂 File location: ${file.absolutePath}")
+                Timber.i("   📏 File size: ${file.length()} bytes")
+
+                Result.success(ExportResult(file, ExportFormat.CSV, predictions.size))
+            } else {
+                Timber.e("❌ File was not created or is empty: ${file.absolutePath}")
+                Result.failure(Exception("Failed to create export file"))
+            }
 
         } catch (e: Exception) {
             Timber.e(e, "❌ Failed to export predictions to CSV")
@@ -85,7 +141,9 @@ class ModelExportManager(private val context: Context) {
         try {
             val timestamp = dateFormat.format(Date())
             val fileName = "predictions_${modelName}_$timestamp.json"
-            val file = File(context.getExternalFilesDir(null), fileName)
+            val file = File(getExportDir(), fileName)
+
+            Timber.d("📝 Writing predictions to: ${file.absolutePath}")
 
             val jsonArray = JSONArray()
             predictions.forEach { pred ->
@@ -111,8 +169,20 @@ class ModelExportManager(private val context: Context) {
 
             file.writeText(rootObj.toString(2))
 
-            Timber.i("✅ Exported ${predictions.size} predictions to JSON: $fileName")
-            Result.success(ExportResult(file, ExportFormat.JSON, predictions.size))
+            // Verify file was created
+            if (file.exists() && file.length() > 0) {
+                // Notify media scanner so file appears immediately
+                notifyMediaScanner(file)
+
+                Timber.i("✅ Exported ${predictions.size} predictions to JSON: $fileName")
+                Timber.i("   📂 File location: ${file.absolutePath}")
+                Timber.i("   📏 File size: ${file.length()} bytes")
+
+                Result.success(ExportResult(file, ExportFormat.JSON, predictions.size))
+            } else {
+                Timber.e("❌ File was not created or is empty: ${file.absolutePath}")
+                Result.failure(Exception("Failed to create export file"))
+            }
 
         } catch (e: Exception) {
             Timber.e(e, "❌ Failed to export predictions to JSON")
@@ -132,7 +202,9 @@ class ModelExportManager(private val context: Context) {
         try {
             val timestamp = dateFormat.format(Date())
             val fileName = "patch_comparison_${patch.id}_$timestamp.json"
-            val file = File(context.getExternalFilesDir(null), fileName)
+            val file = File(getExportDir(), fileName)
+
+            Timber.d("📝 Writing patch comparison to: ${file.absolutePath}")
 
             val jsonObj = JSONObject().apply {
                 put("patchId", patch.id)
@@ -176,14 +248,26 @@ class ModelExportManager(private val context: Context) {
 
             file.writeText(jsonObj.toString(2))
 
-            Timber.i("✅ Exported patch comparison: $fileName")
-            Result.success(
-                ExportResult(
-                    file,
-                    ExportFormat.JSON,
-                    beforePredictions.size + afterPredictions.size
+            // Verify file was created
+            if (file.exists() && file.length() > 0) {
+                // Notify media scanner so file appears immediately
+                notifyMediaScanner(file)
+
+                Timber.i("✅ Exported patch comparison: $fileName")
+                Timber.i("   📂 File location: ${file.absolutePath}")
+                Timber.i("   📏 File size: ${file.length()} bytes")
+
+                Result.success(
+                    ExportResult(
+                        file,
+                        ExportFormat.JSON,
+                        beforePredictions.size + afterPredictions.size
+                    )
                 )
-            )
+            } else {
+                Timber.e("❌ File was not created or is empty: ${file.absolutePath}")
+                Result.failure(Exception("Failed to create export file"))
+            }
 
         } catch (e: Exception) {
             Timber.e(e, "❌ Failed to export patch comparison")
@@ -202,7 +286,9 @@ class ModelExportManager(private val context: Context) {
         try {
             val timestamp = dateFormat.format(Date())
             val fileName = "drift_report_${model.name}_$timestamp.json"
-            val file = File(context.getExternalFilesDir(null), fileName)
+            val file = File(getExportDir(), fileName)
+
+            Timber.d("📝 Writing drift report to: ${file.absolutePath}")
 
             val jsonObj = JSONObject().apply {
                 put("reportGeneratedAt", timestamp)
@@ -269,8 +355,20 @@ class ModelExportManager(private val context: Context) {
 
             file.writeText(jsonObj.toString(2))
 
-            Timber.i("✅ Exported drift report: $fileName")
-            Result.success(ExportResult(file, ExportFormat.JSON, driftResults.size))
+            // Verify file was created
+            if (file.exists() && file.length() > 0) {
+                // Notify media scanner so file appears immediately
+                notifyMediaScanner(file)
+
+                Timber.i("✅ Exported drift report: $fileName")
+                Timber.i("   📂 File location: ${file.absolutePath}")
+                Timber.i("   📏 File size: ${file.length()} bytes")
+
+                Result.success(ExportResult(file, ExportFormat.JSON, driftResults.size))
+            } else {
+                Timber.e("❌ File was not created or is empty: ${file.absolutePath}")
+                Result.failure(Exception("Failed to create export file"))
+            }
 
         } catch (e: Exception) {
             Timber.e(e, "❌ Failed to export drift report")
@@ -340,10 +438,10 @@ class ModelExportManager(private val context: Context) {
      */
     suspend fun cleanupOldExports(daysOld: Int = 7): Int = withContext(Dispatchers.IO) {
         try {
-            val exportsDir = context.getExternalFilesDir(null)
+            val exportsDir = getExportDir()
             var deletedCount = 0
 
-            exportsDir?.listFiles()?.forEach { file ->
+            exportsDir.listFiles()?.forEach { file ->
                 if (file.isFile && isExportFile(file)) {
                     val ageInDays =
                         (System.currentTimeMillis() - file.lastModified()) / (1000 * 60 * 60 * 24)

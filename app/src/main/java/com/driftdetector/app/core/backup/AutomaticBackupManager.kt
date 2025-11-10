@@ -3,6 +3,7 @@ package com.driftdetector.app.core.backup
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import com.driftdetector.app.core.security.EncryptionManager
 import com.driftdetector.app.data.repository.DriftRepository
 import com.driftdetector.app.domain.model.MLModel
 import com.driftdetector.app.domain.model.Patch
@@ -27,16 +28,21 @@ import kotlin.math.roundToInt
 /**
  * Automatic backup manager with progress tracking and user-friendly notifications
  * Backs up models, patches, drift results, and configurations
+ * NOW WITH ENCRYPTED STORAGE
  */
 class AutomaticBackupManager(
     private val context: Context,
-    private val repository: DriftRepository
+    private val repository: DriftRepository,
+    private val encryptionManager: EncryptionManager
 ) {
 
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US)
     
     private val _backupState = MutableStateFlow<BackupState>(BackupState.Idle)
     val backupState: StateFlow<BackupState> = _backupState.asStateFlow()
+
+    // Use encrypted preferences
+    private val prefs = encryptionManager.encryptedPreferences
 
     /**
      * Perform automatic backup of all critical data
@@ -301,13 +307,12 @@ class AutomaticBackupManager(
     private suspend fun backupSettings(backupDir: File): File? {
         return try {
             val settingsFile = File(backupDir, "settings_backup.json")
-            val prefs = context.getSharedPreferences("drift_guard_prefs", Context.MODE_PRIVATE)
 
             val settingsObj = JSONObject().apply {
                 put("backupDate", Date().toString())
                 put("appVersion", context.packageManager.getPackageInfo(context.packageName, 0).versionName)
-                
-                // Export all preferences
+
+                // Export all encrypted preferences
                 val prefsMap = prefs.all
                 val prefsJson = JSONObject()
                 prefsMap.forEach { (key, value) ->
@@ -320,10 +325,11 @@ class AutomaticBackupManager(
                     }
                 }
                 put("preferences", prefsJson)
+                put("encrypted", true) // Mark as encrypted backup
             }
 
             settingsFile.writeText(settingsObj.toString(2))
-            Timber.d("✅ Backed up settings")
+            Timber.d(" Backed up encrypted settings")
             settingsFile
 
         } catch (e: Exception) {

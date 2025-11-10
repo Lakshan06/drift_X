@@ -14,4 +14,19 @@
     <files-path
         name="files"
         path="." />
+
+    <!-- Downloads directory - user accessible -->
+    <external-path
+        name="downloads"
+        path="Download" />
+
+    <!-- Documents directory - user accessible -->
+    <external-path
+        name="documents"
+        path="Documents" />
+
+    <!-- Root external storage - user accessible -->
+    <external-path
+        name="external"
+        path="." />
 </paths>

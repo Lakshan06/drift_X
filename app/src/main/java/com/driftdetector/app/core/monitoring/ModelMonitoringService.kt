@@ -1,6 +1,7 @@
 package com.driftdetector.app.core.monitoring
 
 import android.content.Context
+import com.driftdetector.app.core.notifications.DriftNotificationManager
 import com.driftdetector.app.data.repository.DriftRepository
 import com.driftdetector.app.domain.model.DriftResult
 import com.driftdetector.app.domain.model.MLModel
@@ -18,7 +19,8 @@ import kotlin.random.Random
  */
 class ModelMonitoringService(
     private val context: Context,
-    private val repository: DriftRepository
+    private val repository: DriftRepository,
+    private val notificationManager: DriftNotificationManager
 ) {
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -154,7 +156,7 @@ class ModelMonitoringService(
         currentData: List<FloatArray>
     ) {
         try {
-            Timber.d(" Auto-synthesizing patch for drift")
+            Timber.d("🔧 Auto-synthesizing patch for drift")
 
             val patch = repository.synthesizePatch(
                 modelId = model.id,
@@ -169,6 +171,14 @@ class ModelMonitoringService(
             val stats = _monitoringStats.value
             _monitoringStats.value = stats.copy(
                 patchesSynthesized = stats.patchesSynthesized + 1
+            )
+
+            // Send notification about patch synthesis
+            val safetyScore = patch.validationResult?.metrics?.safetyScore ?: 0.0
+            notificationManager.showPatchSynthesized(
+                modelName = model.name,
+                patchType = patch.patchType.name.replace("_", " "),
+                safetyScore = safetyScore
             )
 
         } catch (e: Exception) {

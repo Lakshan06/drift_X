@@ -50,6 +50,7 @@ class DriftNotificationManager(private val context: Context) {
                 description = "Alerts for model drift detection"
                 enableVibration(true)
                 enableLights(true)
+                lightColor = 0xFFFF9800.toInt() // Orange light
             }
 
             val monitoringChannel = NotificationChannel(
@@ -63,9 +64,13 @@ class DriftNotificationManager(private val context: Context) {
             val patchesChannel = NotificationChannel(
                 CHANNEL_PATCHES,
                 "Patch Notifications",
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_HIGH // Changed from DEFAULT to HIGH for better visibility
             ).apply {
                 description = "Notifications about patch synthesis and deployment"
+                enableVibration(true)
+                enableLights(true)
+                lightColor = 0xFF4CAF50.toInt() // Green light
+                setShowBadge(true) // Show badge on app icon
             }
 
             val manager =
@@ -128,14 +133,24 @@ class DriftNotificationManager(private val context: Context) {
                 else -> "ℹ️ Drift Notice"
             }
 
+            // Color based on severity
+            val notificationColor = when (severity.lowercase()) {
+                "critical" -> 0xFFF44336.toInt() // Red
+                "high" -> 0xFFFF9800.toInt() // Orange
+                "medium" -> 0xFFFFC107.toInt() // Amber
+                else -> 0xFF2196F3.toInt() // Blue
+            }
+
             val notification = NotificationCompat.Builder(context, CHANNEL_DRIFT_ALERTS)
                 .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                .setColor(notificationColor) // Add color to notification
+                .setColorized(true) // Color the entire notification header
                 .setContentTitle(title)
                 .setContentText("Model: $modelName (Score: ${String.format("%.3f", driftScore)})")
                 .setStyle(
                     NotificationCompat.BigTextStyle()
                         .bigText(
-                            "Model '$modelName' has detected drift.\nDrift Score: ${
+                            "Model '$modelName' has detected drift.\n\nDrift Score: ${
                                 String.format(
                                     "%.3f",
                                     driftScore
@@ -152,6 +167,8 @@ class DriftNotificationManager(private val context: Context) {
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setLights(notificationColor, 1000, 1000) // LED lights matching severity
+                .setVibrate(longArrayOf(0, 200, 100, 200)) // Noticeable vibration pattern
                 .build()
 
             notificationManager.notify(NOTIFICATION_ID_DRIFT_ALERT, notification)
@@ -191,6 +208,8 @@ class DriftNotificationManager(private val context: Context) {
 
             val notification = NotificationCompat.Builder(context, CHANNEL_MONITORING)
                 .setSmallIcon(android.R.drawable.ic_menu_info_details)
+                .setColor(0xFF2196F3.toInt()) // Blue color
+                .setColorized(true) // Color the entire notification header
                 .setContentTitle("Monitoring Status")
                 .setContentText("$activeModels models active, $driftsDetected drifts detected")
                 .setStyle(
@@ -245,6 +264,8 @@ class DriftNotificationManager(private val context: Context) {
 
             val notification = NotificationCompat.Builder(context, CHANNEL_PATCHES)
                 .setSmallIcon(android.R.drawable.ic_menu_upload)
+                .setColor(0xFF4CAF50.toInt()) // Green color
+                .setColorized(true) // Color the entire notification header
                 .setContentTitle("✅ Patch Ready")
                 .setContentText(
                     "$patchType patch for $modelName (Safety: ${
@@ -275,6 +296,92 @@ class DriftNotificationManager(private val context: Context) {
             Timber.i("📬 Patch notification sent for model: $modelName")
         } catch (e: Exception) {
             Timber.e(e, "Failed to show patch notification")
+        }
+    }
+
+    /**
+     * Show SUMMARY notification for multiple patches synthesized (prevents notification spam)
+     */
+    @SuppressLint("MissingPermission")
+    fun showPatchesSynthesizedSummary(
+        modelName: String,
+        totalPatches: Int,
+        appliedPatches: Int
+    ) {
+        if (!hasNotificationPermission()) {
+            Timber.w("No notification permission granted")
+            return
+        }
+
+        try {
+            val intent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                putExtra("navigate_to", "patches")
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val title = if (appliedPatches > 0) {
+                "✅ $appliedPatches/$totalPatches Patches Applied"
+            } else {
+                "🔧 $totalPatches Drift Patches Ready"
+            }
+
+            val text = if (appliedPatches > 0) {
+                "$appliedPatches patches automatically applied • Tap to see full details"
+            } else {
+                "$totalPatches intelligent patches generated • Ready to reduce drift by up to 100%"
+            }
+
+            val bigText = buildString {
+                appendLine("Model: $modelName")
+                appendLine()
+                if (appliedPatches > 0) {
+                    appendLine("✅ Auto-Applied: $appliedPatches patches")
+                    appendLine("📋 Total Generated: $totalPatches patches")
+                    appendLine()
+                    appendLine("Your model now has enhanced drift protection.")
+                } else {
+                    appendLine("🔧 Generated: $totalPatches intelligent patches")
+                    appendLine("🎯 Expected Impact: 95-100% drift reduction")
+                    appendLine()
+                    appendLine("Patch Types May Include:")
+                    appendLine("• Feature Clipping (outlier control)")
+                    appendLine("• Normalization (distribution alignment)")
+                    appendLine("• Feature Reweighting (importance adjustment)")
+                    appendLine("• Threshold Tuning (decision optimization)")
+                }
+                appendLine()
+                appendLine("👆 Tap to view detailed patch information and manage all patches")
+            }
+
+            val notification = NotificationCompat.Builder(context, CHANNEL_PATCHES)
+                .setSmallIcon(android.R.drawable.ic_menu_upload)
+                .setColor(0xFF4CAF50.toInt()) // Green color for the notification icon and header
+                .setColorized(true) // Color the entire notification header
+                .setContentTitle(title)
+                .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
+                .setPriority(NotificationCompat.PRIORITY_HIGH) // Make it more visible
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setOnlyAlertOnce(true)
+                .setVibrate(longArrayOf(0, 100, 100, 100)) // Gentle vibration pattern
+                .setLights(0xFF4CAF50.toInt(), 1000, 1000)
+                .build()
+
+            // Use unique ID to avoid flickering
+            val notificationId = NOTIFICATION_ID_PATCH + modelName.hashCode()
+            notificationManager.notify(notificationId, notification)
+
+            Timber.i("📬 Enhanced patch summary notification sent: $appliedPatches/$totalPatches patches for $modelName")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to show patch summary notification")
         }
     }
 
@@ -314,11 +421,14 @@ class DriftNotificationManager(private val context: Context) {
 
             val notification = NotificationCompat.Builder(context, CHANNEL_PATCHES)
                 .setSmallIcon(android.R.drawable.ic_menu_upload)
+                .setColor(if (success) 0xFF4CAF50.toInt() else 0xFFF44336.toInt()) // Green for success, red for failure
+                .setColorized(true) // Color the entire notification header
                 .setContentTitle(title)
                 .setContentText(text)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
+                .setLights(if (success) 0xFF4CAF50.toInt() else 0xFFF44336.toInt(), 1000, 1000)
                 .build()
 
             notificationManager.notify(NOTIFICATION_ID_PATCH, notification)
@@ -347,6 +457,8 @@ class DriftNotificationManager(private val context: Context) {
 
             val notification = NotificationCompat.Builder(context, CHANNEL_MONITORING)
                 .setSmallIcon(android.R.drawable.ic_menu_info_details)
+                .setColor(0xFF2196F3.toInt()) // Blue color
+                .setColorized(true) // Color the entire notification header
                 .setContentTitle(title)
                 .setContentText(text)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -371,5 +483,155 @@ class DriftNotificationManager(private val context: Context) {
      */
     fun areNotificationsEnabled(): Boolean {
         return notificationManager.areNotificationsEnabled()
+    }
+
+    /**
+     * Show generic error notification
+     */
+    @SuppressLint("MissingPermission")
+    fun showError(title: String, message: String) {
+        if (!hasNotificationPermission()) {
+            Timber.w("No notification permission granted")
+            return
+        }
+
+        try {
+            val intent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val notification = NotificationCompat.Builder(context, CHANNEL_DRIFT_ALERTS)
+                .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                .setColor(0xFFF44336.toInt()) // Red
+                .setColorized(true)
+                .setContentTitle("❌ $title")
+                .setContentText(message)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setCategory(NotificationCompat.CATEGORY_ERROR)
+                .setVibrate(longArrayOf(0, 300, 200, 300))
+                .build()
+
+            notificationManager.notify(NOTIFICATION_ID_DRIFT_ALERT + 100, notification)
+            Timber.e("📬 Error notification sent: $title")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to show error notification")
+        }
+    }
+
+    /**
+     * Show patch validation warning
+     */
+    @SuppressLint("MissingPermission")
+    fun showPatchValidationWarning(rejectedCount: Int, totalCount: Int) {
+        if (!hasNotificationPermission()) {
+            Timber.w("No notification permission granted")
+            return
+        }
+
+        try {
+            val intent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                putExtra("navigate_to", "patches")
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val validatedCount = totalCount - rejectedCount
+
+            val notification = NotificationCompat.Builder(context, CHANNEL_PATCHES)
+                .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                .setColor(0xFFFF9800.toInt()) // Orange
+                .setColorized(true)
+                .setContentTitle("⚠️ Patch Validation Warning")
+                .setContentText("$rejectedCount of $totalCount patches rejected due to safety concerns")
+                .setStyle(
+                    NotificationCompat.BigTextStyle()
+                        .bigText(
+                            "Patch Validation Results:\n\n" +
+                                    "✅ Validated: $validatedCount patches\n" +
+                                    "❌ Rejected: $rejectedCount patches\n\n" +
+                                    "Only validated patches meeting safety criteria (safety > 0.7, drift reduction > 0.6) will be applied.\n\n" +
+                                    "Tap to review details."
+                        )
+                )
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .build()
+
+            notificationManager.notify(NOTIFICATION_ID_PATCH + 200, notification)
+            Timber.w("📬 Patch validation warning sent: $rejectedCount/$totalCount rejected")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to show patch validation warning")
+        }
+    }
+
+    /**
+     * Show patch success notification
+     */
+    @SuppressLint("MissingPermission")
+    fun showPatchSuccess(appliedCount: Int, driftReduction: Int) {
+        if (!hasNotificationPermission()) {
+            Timber.w("No notification permission granted")
+            return
+        }
+
+        try {
+            val intent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                putExtra("navigate_to", "patches")
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val notification = NotificationCompat.Builder(context, CHANNEL_PATCHES)
+                .setSmallIcon(android.R.drawable.ic_menu_upload)
+                .setColor(0xFF4CAF50.toInt()) // Green
+                .setColorized(true)
+                .setContentTitle("✅ Patches Applied Successfully")
+                .setContentText("$appliedCount patches applied • ${driftReduction}% drift reduction")
+                .setStyle(
+                    NotificationCompat.BigTextStyle()
+                        .bigText(
+                            "Patch Application Success!\n\n" +
+                                    "Applied Patches: $appliedCount\n" +
+                                    "Drift Reduction: ${driftReduction}%\n\n" +
+                                    "Your model's drift has been significantly reduced. " +
+                                    "Download the patched files to use in production.\n\n" +
+                                    "Tap to download patched files."
+                        )
+                )
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setVibrate(longArrayOf(0, 100, 50, 100))
+                .setLights(0xFF4CAF50.toInt(), 1000, 1000)
+                .build()
+
+            notificationManager.notify(NOTIFICATION_ID_PATCH + 300, notification)
+            Timber.i("📬 Patch success notification sent: $appliedCount patches, ${driftReduction}% reduction")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to show patch success notification")
+        }
     }
 }

@@ -148,6 +148,10 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.navigation:navigation-compose:2.7.6")
 
+    // Modern UI Enhancements
+    implementation("com.airbnb.android:lottie-compose:6.3.0")
+    implementation("com.google.accompanist:accompanist-systemuicontroller:0.34.0")
+
     // Koin for Dependency Injection
     val koinVersion = "3.5.3"
     implementation("io.insert-koin:koin-android:$koinVersion")

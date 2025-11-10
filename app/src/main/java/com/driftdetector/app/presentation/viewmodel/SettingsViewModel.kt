@@ -4,25 +4,37 @@ import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.driftdetector.app.core.backup.AutomaticBackupManager
 import com.driftdetector.app.core.export.ModelExportManager
 import com.driftdetector.app.core.export.PredictionResult
+import com.driftdetector.app.core.security.EncryptionManager
 import com.driftdetector.app.data.repository.DriftRepository
+import com.driftdetector.app.domain.model.MLModel
 import com.driftdetector.app.presentation.screen.ThemeMode
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import timber.log.Timber
 import java.io.File
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import org.json.JSONObject
+import org.json.JSONArray
+import android.net.Uri
 
 /**
  * ViewModel for settings screen
  */
 class SettingsViewModel(
     private val repository: DriftRepository,
-    private val context: Context
+    private val context: Context,
+    private val encryptionManager: EncryptionManager
 ) : ViewModel(), KoinComponent {
 
     private val exportManager: ModelExportManager by inject()
@@ -37,7 +49,7 @@ class SettingsViewModel(
 
     private fun loadSettings() {
         try {
-            val prefs = context.getSharedPreferences("drift_detector_prefs", Context.MODE_PRIVATE)
+            val prefs = encryptionManager.encryptedPreferences
 
             val themeMode = ThemeMode.valueOf(
                 prefs.getString("theme_mode", ThemeMode.AUTO.name) ?: ThemeMode.AUTO.name
@@ -82,8 +94,7 @@ class SettingsViewModel(
     private fun savePreference(key: String, value: Any) {
         viewModelScope.launch {
             try {
-                val prefs =
-                    context.getSharedPreferences("drift_detector_prefs", Context.MODE_PRIVATE)
+                val prefs = encryptionManager.encryptedPreferences
                 prefs.edit().apply {
                     when (value) {
                         is Boolean -> putBoolean(key, value)
@@ -209,119 +220,83 @@ class SettingsViewModel(
     }
 
     fun exportData() {
-        viewModelScope.launch {
-            try {
-                _uiState.update { it.copy(isExporting = true, exportError = null) }
-                Timber.d("📤 Starting data export...")
+        showExportDialog()
+    }
 
-                // Get all active models
-                val models = repository.getActiveModels().first()
+    /**
+     * Export model configuration as JSON
+     */
+    private suspend fun exportModelConfiguration(model: MLModel): Result<String> = withContext(
+        Dispatchers.IO
+    ) {
+        try {
+            val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
+            val fileName = "model_config_${model.name}_$timestamp.json"
 
-                if (models.isEmpty()) {
-                    Timber.w("⚠️ No models found to export")
-                    _uiState.update {
-                        it.copy(
-                            isExporting = false,
-                            exportError = "No models found. Please upload a model first."
-                        )
-                    }
-                    return@launch
-                }
-
-                val exportedFiles = mutableListOf<String>()
-
-                models.forEach { model ->
-                    try {
-                        Timber.d("📊 Exporting data for model: ${model.name}")
-
-                        // Get drift results
-                        val driftResults = repository.getDriftResultsByModel(model.id).first()
-
-                        // Get patches
-                        val patches = repository.getPatchesByModel(model.id).first()
-
-                        // Get recent predictions (last 7 days)
-                        val startTime = Instant.now().minus(7, ChronoUnit.DAYS)
-                        val predictions =
-                            repository.getRecentPredictions(model.id, startTime).first()
-
-                        // Export drift report (JSON)
-                        if (driftResults.isNotEmpty()) {
-                            val driftReportResult = exportManager.exportDriftReport(
-                                model = model,
-                                driftResults = driftResults,
-                                patches = patches
-                            )
-
-                            driftReportResult.onSuccess { exportResult ->
-                                Timber.i("✅ Exported drift report: ${exportResult.fileName}")
-                                exportedFiles.add(exportResult.fileName)
-                            }
-                        }
-
-                        // Export predictions (CSV)
-                        if (predictions.isNotEmpty()) {
-                            val predictionResults = predictions.map { pred ->
-                                PredictionResult(
-                                    timestamp = pred.timestamp,
-                                    input = pred.input.features,
-                                    prediction = pred.outputs,
-                                    confidence = pred.confidence,
-                                    modelVersion = model.version,
-                                    patchId = null, // TODO: Track patch ID with predictions
-                                    driftScore = null // TODO: Track drift score with predictions
-                                )
-                            }
-
-                            val predictionsResult = exportManager.exportPredictionsToCsv(
-                                modelName = model.name,
-                                predictions = predictionResults,
-                                includeMetadata = true
-                            )
-
-                            predictionsResult.onSuccess { exportResult ->
-                                Timber.i("✅ Exported predictions: ${exportResult.fileName}")
-                                exportedFiles.add(exportResult.fileName)
-                            }
-                        }
-
-                    } catch (e: Exception) {
-                        Timber.e(e, "❌ Failed to export data for model: ${model.name}")
-                    }
-                }
-
-                if (exportedFiles.isEmpty()) {
-                    Timber.w("⚠️ No data available to export")
-                    _uiState.update {
-                        it.copy(
-                            isExporting = false,
-                            exportError = "No data available to export. Models need to have predictions or drift results."
-                        )
-                    }
-                } else {
-                    Timber.i("✅ Export complete! Files: ${exportedFiles.joinToString(", ")}")
-                    _uiState.update {
-                        it.copy(
-                            isExporting = false,
-                            exportSuccess = true,
-                            lastExportedFiles = exportedFiles
-                        )
-                    }
-
-                    // Show export location
-                    val exportDir = context.getExternalFilesDir(null)?.absolutePath
-                    Timber.i("📁 Exported files location: $exportDir")
-                }
-
-            } catch (e: Exception) {
-                Timber.e(e, "❌ Export failed")
-                _uiState.update {
-                    it.copy(
-                        isExporting = false,
-                        exportError = "Export failed: ${e.message}"
-                    )
-                }
+            // Use Downloads/DriftGuard/Data folder for user accessibility
+            val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(
+                android.os.Environment.DIRECTORY_DOWNLOADS
+            )
+            val exportDir = File(downloadsDir, "DriftGuard/Data")
+            if (!exportDir.exists()) {
+                exportDir.mkdirs()
             }
+            val file = File(exportDir, fileName)
+
+            Timber.d("📝 Writing model config to: ${file.absolutePath}")
+
+            val jsonObj = JSONObject().apply {
+                put("exportType", "MODEL_CONFIGURATION")
+                put("exportVersion", "1.0")
+                put("modelId", model.id)
+                put("modelName", model.name)
+                put("version", model.version)
+                put("modelPath", model.modelPath)
+                put("inputFeatures", JSONArray(model.inputFeatures))
+                put("outputLabels", JSONArray(model.outputLabels))
+                put("createdAt", model.createdAt.toString())
+                put("lastUpdated", model.lastUpdated.toString())
+                put("isActive", model.isActive)
+                put("exportedAt", timestamp)
+                put("exportedBy", "DriftGuardAI v1.0")
+                put(
+                    "note",
+                    "This is the model configuration export. For drift reports and predictions, ensure the model has been monitored and used."
+                )
+                put("instructions", JSONObject().apply {
+                    put("openWith", "Any text editor or JSON viewer")
+                    put("canImport", "Yes - Can be imported back into DriftGuardAI")
+                    put("dataFormat", "JSON (JavaScript Object Notation)")
+                })
+            }
+
+            // Write with pretty formatting (indent = 2 spaces)
+            file.writeText(jsonObj.toString(2))
+
+            // Verify file was created
+            if (file.exists() && file.length() > 0) {
+                // Notify media scanner so file appears immediately
+                try {
+                    val intent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+                    intent.data = android.net.Uri.fromFile(file)
+                    context.sendBroadcast(intent)
+                    Timber.d("📢 Notified media scanner about: $fileName")
+                } catch (e: Exception) {
+                    Timber.w(e, "Failed to notify media scanner")
+                }
+
+                Timber.i("✅ Exported model config: $fileName")
+                Timber.i("   📂 Full path: ${file.absolutePath}")
+                Timber.i("   📏 File size: ${file.length()} bytes")
+
+                Result.success(fileName)
+            } else {
+                Timber.e("❌ Model config file was not created or is empty: ${file.absolutePath}")
+                Result.failure(Exception("Failed to create model config file"))
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to export model configuration")
+            Result.failure(e)
         }
     }
 
@@ -338,15 +313,25 @@ class SettingsViewModel(
     fun shareLastExport() {
         viewModelScope.launch {
             try {
-                val exportDir = context.getExternalFilesDir(null)
-                val files = exportDir?.listFiles()?.filter { file ->
-                    file.name.startsWith("predictions_") ||
-                            file.name.startsWith("drift_report_") ||
-                            file.name.startsWith("patch_comparison_")
-                }?.sortedByDescending { it.lastModified() }
+                val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(
+                    android.os.Environment.DIRECTORY_DOWNLOADS
+                )
+                val driftGuardDir = File(downloadsDir, "DriftGuard")
 
-                if (files.isNullOrEmpty()) {
-                    Timber.w("⚠️ No export files found")
+                val files = driftGuardDir.walk()
+                    .filter { it.isFile }
+                    .filter { file ->
+                        file.name.startsWith("predictions_") ||
+                                file.name.startsWith("drift_report_") ||
+                                file.name.startsWith("patch_comparison_") ||
+                                file.name.startsWith("patch_") ||
+                                file.name.startsWith("model_config_")
+                    }
+                    .sortedByDescending { it.lastModified() }
+                    .toList()
+
+                if (files.isEmpty()) {
+                    Timber.w("⚠️ No export files found in Downloads/DriftGuard")
                     return@launch
                 }
 
@@ -361,6 +346,7 @@ class SettingsViewModel(
                 val mimeType = when {
                     latestFile.name.endsWith(".csv") -> "text/csv"
                     latestFile.name.endsWith(".json") -> "application/json"
+                    latestFile.name.endsWith(".txt") -> "text/plain"
                     else -> "*/*"
                 }
 
@@ -368,7 +354,10 @@ class SettingsViewModel(
                     type = mimeType
                     putExtra(Intent.EXTRA_STREAM, uri)
                     putExtra(Intent.EXTRA_SUBJECT, "DriftGuard AI Export - ${latestFile.name}")
-                    putExtra(Intent.EXTRA_TEXT, "Exported data from DriftGuard AI")
+                    putExtra(
+                        Intent.EXTRA_TEXT,
+                        "Exported data from DriftGuard AI\n\nAll files are saved in: Downloads/DriftGuard/"
+                    )
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
 
@@ -383,19 +372,43 @@ class SettingsViewModel(
 
     fun openExportLocation() {
         try {
-            val exportDir = context.getExternalFilesDir(null)
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(
-                    androidx.core.content.FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        exportDir!!
-                    ),
-                    "resource/folder"
-                )
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(
+                android.os.Environment.DIRECTORY_DOWNLOADS
+            )
+            val driftGuardDir = File(downloadsDir, "DriftGuard")
+
+            // Ensure directory exists
+            if (!driftGuardDir.exists()) {
+                driftGuardDir.mkdirs()
             }
-            context.startActivity(Intent.createChooser(intent, "Open Export Folder"))
+
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                driftGuardDir
+            )
+
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "resource/folder")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+
+            try {
+                context.startActivity(Intent.createChooser(intent, "Open Export Folder"))
+            } catch (e: Exception) {
+                // Fallback: Open Downloads folder
+                val downloadsIntent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(
+                        android.net.Uri.parse("content://com.android.externalstorage.documents/document/primary:Download"),
+                        "vnd.android.document/directory"
+                    )
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(downloadsIntent)
+            }
+
+            Timber.i("📂 Opening export location: Downloads/DriftGuard")
         } catch (e: Exception) {
             Timber.e(e, "❌ Failed to open export location")
         }
@@ -434,6 +447,350 @@ class SettingsViewModel(
         _uiState.update { it.copy(autoBackupModels = enabled) }
         savePreference("auto_backup_models", enabled)
     }
+
+    // Export Data Methods
+    fun showExportDialog() {
+        viewModelScope.launch {
+            try {
+                Timber.d("📤 Opening export dialog...")
+
+                // Load all models with their export status
+                val models = repository.getActiveModels().first()
+                val modelExportInfoList = mutableListOf<ModelExportInfo>()
+
+                models.forEach { model ->
+                    // Get patches for this model
+                    val patches = repository.getPatchesByModel(model.id).first()
+                    val patchedCount =
+                        patches.count { it.status == com.driftdetector.app.domain.model.PatchStatus.APPLIED }
+                    val ongoingCount = patches.count {
+                        it.status == com.driftdetector.app.domain.model.PatchStatus.CREATED ||
+                                it.status == com.driftdetector.app.domain.model.PatchStatus.VALIDATED
+                    }
+
+                    // Get drift results
+                    val driftCount = repository.getDriftCount(model.id)
+
+                    // Get predictions count (approximate from recent 30 days)
+                    val startTime = Instant.now().minus(30, ChronoUnit.DAYS)
+                    val predictions = repository.getRecentPredictions(model.id, startTime).first()
+
+                    modelExportInfoList.add(
+                        ModelExportInfo(
+                            modelId = model.id,
+                            modelName = model.name,
+                            version = model.version,
+                            hasPatches = patches.isNotEmpty(),
+                            patchedCount = patchedCount,
+                            ongoingCount = ongoingCount,
+                            driftCount = driftCount,
+                            predictionCount = predictions.size
+                        )
+                    )
+                }
+
+                _uiState.update {
+                    it.copy(
+                        showExportDialog = true,
+                        availableModels = modelExportInfoList,
+                        selectedModelIds = emptySet() // Reset selection
+                    )
+                }
+
+                Timber.d("✅ Loaded ${modelExportInfoList.size} models for export")
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to load models for export")
+                _uiState.update {
+                    it.copy(exportError = "Failed to load models: ${e.message}")
+                }
+            }
+        }
+    }
+
+    fun closeExportDialog() {
+        _uiState.update {
+            it.copy(
+                showExportDialog = false,
+                selectedModelIds = emptySet()
+            )
+        }
+    }
+
+    fun toggleModelSelection(modelId: String) {
+        _uiState.update { state ->
+            val newSelection = if (state.selectedModelIds.contains(modelId)) {
+                state.selectedModelIds - modelId
+            } else {
+                state.selectedModelIds + modelId
+            }
+            state.copy(selectedModelIds = newSelection)
+        }
+    }
+
+    fun selectDownloadLocation(location: ExportLocation) {
+        _uiState.update { it.copy(downloadLocation = location) }
+
+        // If CUSTOM, open file picker
+        if (location == ExportLocation.CUSTOM) {
+            // TODO: Launch Android file picker
+            Timber.d("Opening custom location picker...")
+        }
+    }
+
+    fun exportSelectedModels() {
+        viewModelScope.launch {
+            try {
+                val selectedIds = _uiState.value.selectedModelIds
+
+                if (selectedIds.isEmpty()) {
+                    _uiState.update {
+                        it.copy(exportError = "Please select at least one model to export")
+                    }
+                    return@launch
+                }
+
+                // Close dialog and start export
+                _uiState.update {
+                    it.copy(
+                        showExportDialog = false,
+                        isExporting = true,
+                        exportError = null
+                    )
+                }
+
+                Timber.d("📤 Exporting ${selectedIds.size} selected models...")
+
+                // Always use Downloads/DriftGuard folder for user accessibility
+                val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(
+                    android.os.Environment.DIRECTORY_DOWNLOADS
+                )
+                val exportDir = File(downloadsDir, "DriftGuard/Data")
+
+                // Log the exact path
+                Timber.i("📁 Export directory: ${exportDir.absolutePath}")
+
+                if (!exportDir.exists()) {
+                    val created = exportDir.mkdirs()
+                    Timber.i("📁 Created directory: $created")
+                }
+
+                // Verify directory is writable
+                if (!exportDir.canWrite()) {
+                    Timber.e("❌ Directory is NOT writable!")
+                    _uiState.update {
+                        it.copy(
+                            isExporting = false,
+                            exportError = "Cannot write to export directory: ${exportDir.absolutePath}"
+                        )
+                    }
+                    return@launch
+                }
+
+                val exportedFiles = mutableListOf<String>()
+
+                selectedIds.forEach { modelId ->
+                    val modelInfo = _uiState.value.availableModels.find { it.modelId == modelId }
+                    val model = repository.getActiveModels().first().find { it.id == modelId }
+
+                    if (model != null) {
+                        Timber.d("📊 Exporting model: ${model.name}")
+
+                        // Always export model configuration first
+                        val configResult = exportModelConfiguration(model)
+                        configResult.onSuccess { fileName ->
+                            exportedFiles.add(fileName)
+                            Timber.i("✅ Exported model config: $fileName")
+                        }.onFailure { error ->
+                            Timber.e(error, "❌ Failed to export model config for ${model.name}")
+                        }
+
+                        // Export drift report if available
+                        val driftResults = repository.getDriftResultsByModel(model.id).first()
+                        val patches = repository.getPatchesByModel(model.id).first()
+
+                        if (driftResults.isNotEmpty() || patches.isNotEmpty()) {
+                            val driftReportResult = exportManager.exportDriftReport(
+                                model = model,
+                                driftResults = driftResults,
+                                patches = patches
+                            )
+
+                            driftReportResult.onSuccess { exportResult ->
+                                exportedFiles.add(exportResult.fileName)
+                                Timber.i("✅ Exported drift report: ${exportResult.fileName}")
+                                Timber.i("   📂 Full path: ${exportResult.file.absolutePath}")
+                            }.onFailure { error ->
+                                Timber.e(error, "❌ Failed to export drift report for ${model.name}")
+                            }
+                        } else {
+                            // Create a sample drift report template
+                            val timestamp =
+                                SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
+                            val fileName = "drift_report_${model.name}_$timestamp.json"
+                            val file = File(exportDir, fileName)
+
+                            try {
+                                val sampleReport = JSONObject().apply {
+                                    put("reportGeneratedAt", timestamp)
+                                    put("model", JSONObject().apply {
+                                        put("id", model.id)
+                                        put("name", model.name)
+                                        put("version", model.version)
+                                        put("createdAt", model.createdAt.toString())
+                                    })
+                                    put("driftHistory", JSONArray())
+                                    put("patchesApplied", JSONArray())
+                                    put("summary", JSONObject().apply {
+                                        put("totalDriftEvents", 0)
+                                        put("driftDetectedCount", 0)
+                                        put("totalPatchesApplied", 0)
+                                        put(
+                                            "note",
+                                            "No drift data available yet. Start monitoring this model to generate drift reports."
+                                        )
+                                    })
+                                }
+
+                                file.writeText(sampleReport.toString(2))
+
+                                // Notify media scanner
+                                val intent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+                                intent.data = android.net.Uri.fromFile(file)
+                                context.sendBroadcast(intent)
+
+                                exportedFiles.add(fileName)
+                                Timber.i("✅ Exported sample drift report: $fileName")
+                            } catch (e: Exception) {
+                                Timber.e(e, "Failed to create sample drift report")
+                            }
+                        }
+
+                        // Export predictions if available
+                        if (modelInfo != null && modelInfo.predictionCount > 0) {
+                            val startTime = Instant.now().minus(30, ChronoUnit.DAYS)
+                            val predictions =
+                                repository.getRecentPredictions(model.id, startTime).first()
+
+                            if (predictions.isNotEmpty()) {
+                                val predictionResults = predictions.map { pred ->
+                                    PredictionResult(
+                                        timestamp = pred.timestamp,
+                                        input = pred.input.features,
+                                        prediction = pred.outputs,
+                                        confidence = pred.confidence,
+                                        modelVersion = model.version,
+                                        patchId = null,
+                                        driftScore = null
+                                    )
+                                }
+
+                                val predictionsResult = exportManager.exportPredictionsToCsv(
+                                    modelName = model.name,
+                                    predictions = predictionResults,
+                                    includeMetadata = true
+                                )
+
+                                predictionsResult.onSuccess { exportResult ->
+                                    exportedFiles.add(exportResult.fileName)
+                                    Timber.i("✅ Exported predictions: ${exportResult.fileName}")
+                                    Timber.i("   📂 Full path: ${exportResult.file.absolutePath}")
+                                }.onFailure { error ->
+                                    Timber.e(
+                                        error,
+                                        "❌ Failed to export predictions for ${model.name}"
+                                    )
+                                }
+                            }
+                        } else {
+                            // Create a sample CSV template
+                            val timestamp =
+                                SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
+                            val fileName = "predictions_${model.name}_$timestamp.csv"
+                            val file = File(exportDir, fileName)
+
+                            try {
+                                val csvContent = buildString {
+                                    appendLine("# DriftGuardAI Predictions Export")
+                                    appendLine("# Model: ${model.name}")
+                                    appendLine("# Version: ${model.version}")
+                                    appendLine("# Exported: $timestamp")
+                                    appendLine("# Note: No prediction data available yet. Start using the model to generate predictions.")
+                                    appendLine()
+                                    appendLine("Timestamp,Input,Prediction,Confidence,Model Version,Patch Applied,Drift Score")
+                                    appendLine("# Example: 2025-01-15T10:30:00Z,\"[0.5, 1.2, 3.4]\",\"[0, 1]\",0.95,v1.0,No,N/A")
+                                }
+
+                                file.writeText(csvContent)
+
+                                // Notify media scanner
+                                val intent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+                                intent.data = android.net.Uri.fromFile(file)
+                                context.sendBroadcast(intent)
+
+                                exportedFiles.add(fileName)
+                                Timber.i("✅ Exported sample predictions template: $fileName")
+                            } catch (e: Exception) {
+                                Timber.e(e, "Failed to create sample predictions template")
+                            }
+                        }
+                    }
+                }
+
+                if (exportedFiles.isEmpty()) {
+                    _uiState.update {
+                        it.copy(
+                            isExporting = false,
+                            exportError = "No data available to export from selected models"
+                        )
+                    }
+                } else {
+                    val exportPath = "Downloads/DriftGuard/Data"
+                    val fullPath = exportDir.absolutePath
+
+                    Timber.i("✅ Export complete! ${exportedFiles.size} files exported to $exportPath")
+                    Timber.i("   📂 Full path: $fullPath")
+
+                    // Show toast notification
+                    withContext(Dispatchers.Main) {
+                        android.widget.Toast.makeText(
+                            context,
+                            "✅ ${exportedFiles.size} file(s) saved to:\n$exportPath",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    }
+
+                    _uiState.update {
+                        it.copy(
+                            isExporting = false,
+                            exportSuccess = true,
+                            lastExportedFiles = exportedFiles,
+                            lastExportPath = exportPath
+                        )
+                    }
+                }
+
+            } catch (e: Exception) {
+                Timber.e(e, "❌ Export failed")
+
+                // Show error toast
+                withContext(Dispatchers.Main) {
+                    android.widget.Toast.makeText(
+                        context,
+                        "❌ Export failed: ${e.message}",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+
+                _uiState.update {
+                    it.copy(
+                        isExporting = false,
+                        exportError = "Export failed: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
 }
 
 /**
@@ -475,12 +832,41 @@ data class SettingsUiState(
     val autoBackupModels: Boolean = true,
 
     // Export State
+    val showExportDialog: Boolean = false,
+    val availableModels: List<ModelExportInfo> = emptyList(),
+    val selectedModelIds: Set<String> = emptySet(),
+    val downloadLocation: ExportLocation = ExportLocation.INTERNAL,
+    val customDownloadPath: String? = null,
     val isExporting: Boolean = false,
     val exportSuccess: Boolean = false,
     val exportError: String? = null,
     val lastExportedFiles: List<String> = emptyList(),
+    val lastExportPath: String = "",
 
     // About
     val appVersion: String = "1.0.0",
     val storageUsed: String = "Calculating..."
 )
+
+/**
+ * Model export information
+ */
+data class ModelExportInfo(
+    val modelId: String,
+    val modelName: String,
+    val version: String,
+    val hasPatches: Boolean,
+    val patchedCount: Int,
+    val ongoingCount: Int,
+    val driftCount: Int,
+    val predictionCount: Int
+)
+
+/**
+ * Export location options
+ */
+enum class ExportLocation(val displayName: String) {
+    INTERNAL("Internal Storage (App Data)"),
+    DOWNLOADS("Downloads Folder"),
+    CUSTOM("Custom Location")
+}

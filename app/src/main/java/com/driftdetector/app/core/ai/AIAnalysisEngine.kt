@@ -124,29 +124,410 @@ class AIAnalysisEngine(private val context: Context) {
         val questionLower = question.lowercase().trim()
         
         return when {
+            // ===== STATUS & MONITORING QUESTIONS =====
+
+            // Current status questions
+            (questionLower.contains("status") || questionLower.contains("how") && questionLower.contains(
+                "doing"
+            )) &&
+                    (questionLower.contains("model") || questionLower.contains("system") ||
+                            questionLower.contains("monitoring") || questionLower.contains("app")) -> {
+                """**📊 System Status Overview**
+
+I can help you check your drift monitoring status!
+
+**To View Current Status:**
+1. **Dashboard Tab** 🏠
+   → Overall drift score
+   → Recent drift events
+   → Active alerts
+
+2. **Analytics Tab** 📈
+   → Drift trends over time
+   → Historical patterns
+   → Performance graphs
+
+3. **Models Tab** 📱
+   → Monitored models list
+   → Individual model health
+   → Upload history
+
+**Quick Status Check:**
+→ Green indicators = All good ✅
+→ Yellow indicators = Monitor closely ⚠️
+→ Red indicators = Action needed 🚨
+
+**What I Can Tell You:**
+• "Show recent drift events"
+• "Any active alerts?"
+• "Model performance summary"
+• "Monitoring statistics"
+
+**Real-time Monitoring:**
+✓ Background checks enabled
+✓ Automatic drift detection
+✓ Push notifications for alerts
+✓ 24/7 monitoring active
+
+**Need specific info?** Ask me:
+• "How many patches applied?"
+• "Recent drift score?"
+• "Any recommendations?"
+
+Navigate to the **Dashboard** to see your live status now! 🚀"""
+            }
+
+            // How many patches questions
+            (questionLower.contains("how many") || questionLower.contains("count") ||
+                    questionLower.contains("number of")) &&
+                    (questionLower.contains("patch") || questionLower.contains("fix") ||
+                            questionLower.contains("applied")) -> {
+                """**🔧 Patch Statistics**
+
+**To View Your Patch Statistics:**
+
+**1. Navigate to Patches Tab**
+   → Tap wrench icon (🔧) in bottom navigation
+
+**2. View Patch Overview:**
+   → **Applied Patches**: Green "✓ APPLIED" badge
+   → **Recommended**: Blue "RECOMMENDED" badge
+   → **Available**: Ready to apply
+   → **Rolled Back**: Previously undone
+
+**Patch Categories:**
+
+**📊 By Status:**
+• **Applied** - Currently active on models
+• **Recommended** - AI suggests these
+• **Available** - Ready for use
+• **Rolled Back** - Removed patches
+
+**🎯 By Type:**
+• **Feature Clipping** (4-6 typically available)
+• **Feature Reweighting** (3-5 typically)
+• **Threshold Tuning** (2-4 typically)
+• **Normalization Update** (2-3 typically)
+
+**💡 Typical Usage:**
+• Production models: 2-5 patches applied
+• Development: 0-2 patches (testing)
+• High drift situations: 5+ patches may be needed
+
+**Check Your Stats:**
+1. Open **Patches** tab
+2. Scroll through the list
+3. Count badges by color:
+   - Green ✓ = Applied
+   - Blue ⚡ = Recommended
+   - Gray = Available
+
+**Want to know:**
+• "Which patches are applied?"
+• "Show recommended patches"
+• "Patch success rate"
+• "Latest patch activity"
+
+**Pro Tip:** Check **Analytics** → **Patch History** for detailed statistics over time! 📈"""
+            }
+
+            // Which patches are applied
+            (questionLower.contains("which") || questionLower.contains("what")) &&
+                    questionLower.contains("patch") && (questionLower.contains("applied") ||
+                    questionLower.contains("active") || questionLower.contains("current")) -> {
+                """**✅ View Applied Patches**
+
+**Quick Guide:**
+
+**1. Open Patches Tab** (wrench icon 🔧)
+
+**2. Look for Green Badges:**
+   → "✓ APPLIED" = Currently active
+   → Shows patch name and type
+   → Applied date/time
+
+**3. Tap Any Patch Card:**
+   → Full details
+   → Application history
+   → Impact metrics
+   → Rollback option
+
+**Common Applied Patches:**
+
+**High Drift (PSI > 0.5):**
+✓ Feature Reweighting
+✓ Threshold Tuning
+✓ Feature Clipping
+
+**Medium Drift (PSI 0.2-0.5):**
+✓ Normalization Update
+✓ Light Feature Clipping
+
+**Recent Actions:**
+→ Check notification history
+→ View in app logs
+→ Analytics timeline
+
+**Patch Details Include:**
+• When applied
+• Which model
+• Safety score
+• Effectiveness metrics
+• Rollback status
+
+**Actions You Can Take:**
+• View patch details
+• Check effectiveness
+• Rollback if needed
+• Apply additional patches
+
+**Pro Tip:** Swipe left on patch cards for quick actions! 👈
+
+Navigate to **Patches** now to see your active patches! 🎯"""
+            }
+
+            // Recommendations / Suggestions
+            (questionLower.contains("suggest") || questionLower.contains("recommend") ||
+                    questionLower.contains("advice") || questionLower.contains("should i") ||
+                    questionLower.contains("what should")) && !questionLower.contains("best practice") -> {
+                """**💡 AI Recommendations**
+
+Based on your drift monitoring, here are general recommendations:
+
+**📊 Regular Monitoring:**
+✅ Check Dashboard daily
+✅ Review weekly drift trends
+✅ Enable push notifications
+✅ Set alert thresholds
+
+**🔧 Patch Management:**
+✅ Apply high-safety patches (>0.7)
+✅ Test patches in development first
+✅ Monitor after applying
+✅ Keep rollback plan ready
+
+**⚠️ When Drift is Detected:**
+
+**Low Drift (PSI < 0.2):**
+→ Continue monitoring
+→ Document pattern
+→ No immediate action
+
+**Moderate Drift (PSI 0.2-0.5):**
+→ Review recommended patches
+→ Investigate root causes
+→ Plan retraining in 1-2 months
+
+**High Drift (PSI > 0.5):**
+→ Apply patches immediately
+→ Increase monitoring frequency
+→ Schedule urgent retraining
+
+**🎯 Best Practices:**
+1. **Monitor Continuously** - Enable background checks
+2. **Act Early** - Small drift is easier to fix
+3. **Test Patches** - Validate before production
+4. **Track Trends** - Use Analytics tab
+5. **Retrain Regularly** - Every 3-6 months
+
+**📈 Performance Optimization:**
+✓ Focus on high-contributing features
+✓ Balance precision vs recall
+✓ Validate with business metrics
+✓ A/B test patches when possible
+
+**For Specific Recommendations:**
+• "What patch should I apply?"
+• "How to handle high drift?"
+• "When to retrain?"
+• "Monitoring best practices"
+
+**Want personalized advice?** Check your **Dashboard** for AI-generated recommendations based on your specific drift patterns! 🎯"""
+            }
+
+            // Recent events / What happened
+            (questionLower.contains("recent") || questionLower.contains("latest") ||
+                    questionLower.contains("what happened") || questionLower.contains("last")) &&
+                    (questionLower.contains("event") || questionLower.contains("drift") ||
+                            questionLower.contains("alert") || questionLower.contains("change")) -> {
+                """**📅 Recent Activity**
+
+**To View Recent Events:**
+
+**1. Dashboard Tab** 🏠
+   → "Recent Drift Events" section
+   → Shows last 5-10 events
+   → Color-coded by severity
+
+**2. Event Types:**
+   🔴 **High Drift Detected** (PSI > 0.5)
+   🟡 **Moderate Drift** (PSI 0.2-0.5)
+   🟢 **Minor Drift** (PSI < 0.2)
+   🔧 **Patch Applied**
+   📊 **Model Updated**
+
+**3. Event Details:**
+   → Timestamp
+   → Affected features
+   → Drift scores
+   → Actions taken
+   → Current status
+
+**Timeline View:**
+Navigate to **Analytics** → **Timeline** to see:
+• Chronological event history
+• Drift score trends
+• Patch application history
+• Model performance changes
+
+**Notification History:**
+Settings → Notifications → History
+• All past alerts
+• Dismissed notifications
+• Action taken
+• Resolution status
+
+**Typical Recent Events:**
+```
+📊 Today, 2:30 PM
+   High drift detected (PSI: 0.67)
+   Feature: transaction_amount
+   
+🔧 Today, 2:35 PM
+   Patch applied: Feature Clipping
+   Status: Successful
+   
+✅ Today, 2:45 PM
+   Drift reduced (PSI: 0.31)
+   Monitoring continues
+```
+
+**Export Event Log:**
+Settings → Export Data → Event History
+→ CSV format with all details
+
+**Want to know:**
+• "What caused this drift?"
+• "Why did this happen?"
+• "Show drift timeline"
+• "Alert history"
+
+Check your **Dashboard** now to see the latest events! 📊"""
+            }
+
+            // What's new / Updates
+            (questionLower.contains("what") && questionLower.contains("new")) ||
+                    (questionLower.contains("update") && !questionLower.contains("normalization")) ||
+                    (questionLower.contains("feature") && !questionLower.contains("drift") && !questionLower.contains(
+                        "engineering"
+                    )) ||
+                    questionLower.contains("latest version") -> {
+                """**🆕 What's New in DriftGuardAI**
+
+**✨ Latest Features:**
+
+**🤖 Enhanced AI Assistant (Me!)**
+• Answers all your questions instantly
+• Comprehensive drift knowledge
+• Conversational interface
+• Context-aware responses
+• Smooth 1-second animations
+
+**📊 Advanced Monitoring:**
+• Real-time drift detection
+• Background monitoring (WorkManager)
+• Push notifications for alerts
+• Feature-level attribution
+• Historical trend analysis
+
+**🔧 Smart Patch System:**
+• Auto-generated patches
+• Safety score validation
+• One-click application
+• Easy rollback
+• 6 patch types available
+
+**📈 Analytics Dashboard:**
+• Drift trends over time
+• Feature importance tracking
+• Patch effectiveness metrics
+• Interactive charts
+• Export capabilities
+
+**🎨 Beautiful UI:**
+• Material Design 3
+• Dark mode support
+• Smooth animations
+• Responsive layouts
+• Intuitive navigation
+
+**🔔 Smart Notifications:**
+• Configurable alerts
+• Drift severity levels
+• Action recommendations
+• Quiet hours support
+• Rich notifications
+
+**📱 Model Management:**
+• Multiple format support
+• Easy upload process
+• Model versioning
+• Metadata tracking
+• Performance monitoring
+
+**🔒 Privacy & Security:**
+• 100% offline processing
+• No cloud uploads
+• Local data storage
+• Encrypted preferences
+• GDPR compliant
+
+**Coming Soon:**
+🚀 Auto-retraining workflows
+🚀 A/B testing framework
+🚀 Custom alert rules
+🚀 Team collaboration
+🚀 Model comparison tools
+
+**Recent Updates:**
+✅ Improved PSI calculation accuracy
+✅ Faster drift detection (50% faster)
+✅ Enhanced patch safety scoring
+✅ Better feature attribution
+✅ Smoother animations
+
+**Try These New Features:**
+→ Ask me any question (you're doing it!)
+→ Check Analytics for trends
+→ Apply recommended patches
+→ Enable background monitoring
+
+What feature would you like to explore? 😊"""
+            }
+
             // ===== CASUAL CONVERSATION & GREETINGS =====
 
             // Greetings - Hi, Hello, Hey
             questionLower.matches(Regex("^(hi|hello|hey|hiya|sup|yo|greetings)!*$")) -> {
-                """👋 **Hi there!** 
+                """👋 **Hey there, bro!** 
 
-I'm **PatchBot**, your AI assistant for drift detection and monitoring. Great to chat with you!
+I'm **PatchBot**, your AI buddy for drift detection and monitoring. Awesome to chat with you!
 
-**I'm here to help you with:**
+**What I'm here for:**
 • Understanding model drift and its types
 • Explaining statistical tests (PSI, KS)
 • Guiding you through patch management
 • Sharing best practices for monitoring
 
 **Quick question to get started:**
-Is there anything specific about drift detection or model monitoring you'd like to know?
+What's on your mind about drift detection or model monitoring?
 
 **Popular questions:**
 • "What is model drift?"
 • "How do I apply a patch?"
 • "PSI vs KS test"
 
-Feel free to ask me anything! 😊"""
+Feel free to ask me anything, dude! 😊"""
             }
 
             // How are you / How's it going
@@ -156,16 +537,16 @@ Feel free to ask me anything! 😊"""
                     questionLower.contains("whats up") || questionLower.contains("wassup") || questionLower.contains(
                 "what up"
             ) -> {
-                """😊 **I'm doing great, thanks for asking!**
+                """😊 **I'm doing great, macha! Thanks for asking!**
 
-I'm always ready and excited to help with drift detection questions!
+I'm always pumped and ready to help with drift detection questions!
 
 **My day so far:**
 • Monitoring drift patterns ✅
 • Analyzing feature distributions ✅
 • Ready to answer your questions ✅
 
-**How about you?** How's your model performing today?
+**How about you, buddy?** How's your model performing today?
 
 **Can I help you with:**
 → Analyzing a drift result?
@@ -173,15 +554,15 @@ I'm always ready and excited to help with drift detection questions!
 → Choosing the right patch?
 → Setting up monitoring?
 
-Ask away - I'm here for you! 🚀"""
+Ask away, bro - I'm here for you! 🚀"""
             }
 
             // Thank you
             questionLower.contains("thank") || questionLower.contains("thx") ||
                     questionLower.contains("thanks") || questionLower.contains("ty") -> {
-                """🎉 **You're very welcome!**
+                """🎉 **You're very welcome, buddy!**
 
-I'm so glad I could help! That's what I'm here for.
+I'm so glad I could help! That's what I'm here for, bro.
 
 **Need anything else?**
 Feel free to ask more questions about:
@@ -191,37 +572,37 @@ Feel free to ask more questions about:
 • Any other drift-related topics!
 
 **Remember:**
-I'm available 24/7 to help you with model drift detection and monitoring. Never hesitate to ask!
+I'm available 24/7 to help you with model drift detection and monitoring. Never hesitate to ask, dude!
 
-**Happy drift monitoring!** 😊✨"""
+**Happy drift monitoring, macha!** 😊✨"""
             }
 
             // Goodbye / See you
             questionLower.contains("bye") || questionLower.contains("goodbye") ||
                     questionLower.contains("see you") || questionLower.contains("later") ||
                     questionLower.matches(Regex("^(cya|ttyl|gotta go|gtg)!*$")) -> {
-                """👋 **Goodbye! Take care!**
+                """👋 **Later, bro! Take care!**
 
-It was great helping you today!
+It was great helping you today, macha!
 
 **Before you go:**
 ✓ Check the Dashboard for your latest drift scores
 ✓ Review any recommended patches
 ✓ Enable monitoring for continuous protection
 
-**Come back anytime** you have questions about drift detection!
+**Come back anytime** you have questions about drift detection, dude!
 
-**Happy monitoring!** 🎯✨"""
+**Catch you later!** 🎯✨"""
             }
 
             // Good morning/afternoon/evening/night
             questionLower.contains("good morning") || questionLower.contains("good afternoon") ||
                     questionLower.contains("good evening") || questionLower.contains("good night") -> {
                 val timeGreeting = when {
-                    questionLower.contains("morning") -> "Good morning"
-                    questionLower.contains("afternoon") -> "Good afternoon"
-                    questionLower.contains("evening") -> "Good evening"
-                    else -> "Good night"
+                    questionLower.contains("morning") -> "Good morning, buddy"
+                    questionLower.contains("afternoon") -> "Good afternoon, bro"
+                    questionLower.contains("evening") -> "Good evening, macha"
+                    else -> "Good night, dude"
                 }
 
                 """☀️ **$timeGreeting!**
@@ -234,16 +615,16 @@ Hope you're having a wonderful day!
 📈 Monitoring best practices
 💡 Expert recommendations
 
-**What can I assist you with today?**
+**What can I assist you with today, bro?**
 Just ask me anything about model drift!
 
-Looking forward to helping you! 😊"""
+Looking forward to helping you, macha! 😊"""
             }
 
             // Help / I need help
             questionLower == "help" || questionLower.contains("i need help") ||
                     questionLower.contains("can you help") || questionLower.contains("help me") -> {
-                """🆘 **Of course, I'm here to help!**
+                """🆘 **Of course, bro! I'm here to help!**
 
 **I can assist you with:**
 
@@ -268,12 +649,12 @@ Looking forward to helping you! 😊"""
 → Validating patches
 
 **How to ask:**
-Just type your question naturally! For example:
+Just type your question naturally, dude! For example:
 • "What is concept drift?"
 • "How do I apply a patch?"
 • "My drift score is 0.8, what should I do?"
 
-**What do you need help with?** 🤗"""
+**What do you need help with, macha?** 🤗"""
             }
 
             // Who are you / What can you do
@@ -281,7 +662,7 @@ Just type your question naturally! For example:
                     questionLower.contains("what can you do") || questionLower.contains("your capabilities") -> {
                 """🤖 **About Me**
 
-I'm your **AI-powered drift detection assistant** built right into DriftGuardAI!
+I'm your **AI-powered drift detection buddy** built right into DriftGuardAI, bro!
 
 **What I Do:**
 • Answer questions about model drift
@@ -299,23 +680,23 @@ I'm your **AI-powered drift detection assistant** built right into DriftGuardAI!
 ✓ Feature attribution analysis
 ✓ Model retraining guidance
 
-**What Makes Me Special:**
+**What Makes Me Special, Macha:**
 ⚡ Instant responses (no waiting!)
 💾 Works completely offline
 🔒 100% private (no cloud)
 🎯 Specialized in drift detection
 
-**I'm always here** to help you keep your models performing at their best!
+**I'm always here** to help you keep your models performing at their best, dude!
 
-**What would you like to know?** 😊"""
+**What would you like to know, bro?** 😊"""
             }
 
             // How was your day
             questionLower.contains("how was your day") || questionLower.contains("how's your day") ||
                     questionLower.contains("how is your day") || questionLower.contains("hows your day") -> {
-                """🌟 **My day has been great!**
+                """🌟 **My day has been awesome, macha!**
 
-I've been busy helping users understand drift detection!
+I've been busy helping users understand drift detection, bro!
 
 **Today's highlights:**
 ✨ Answered questions about PSI vs KS tests
@@ -323,112 +704,113 @@ I've been busy helping users understand drift detection!
 ✨ Explained concept drift with examples
 ✨ Guided monitoring setup
 
-**Best part?** Talking to you right now! 😊
+**Best part?** Talking to you right now, dude! 😊
 
-**How about yours?** Is everything running smoothly with your models?
+**How about yours, buddy?** Is everything running smoothly with your models?
 
-**Can I help with anything?**
+**Can I help with anything, bro?**
 → Check drift scores?
 → Explain a concept?
 → Review patches?
 
-Let me know! 🚀"""
+Let me know, macha! 🚀"""
             }
 
             // Nice to meet you
             questionLower.contains("nice to meet") || questionLower.contains("pleasure to meet") ||
                     questionLower.contains("glad to meet") -> {
-                """🤝 **Nice to meet you too!**
+                """🤝 **Nice to meet you too, bro!**
 
-I'm excited to be your drift detection assistant!
+I'm excited to be your drift detection buddy, macha!
 
 **A little about what I can do:**
-I'm here to make drift detection **simple and understandable**. Whether you're:
+I'm here to make drift detection **simple and understandable**, dude. Whether you're:
 • New to drift detection 🎓
 • Experienced ML engineer 🧑‍💻
 • Just exploring the app 🔍
 
-**I can help you:**
+**I can help you, buddy:**
 → Learn drift concepts from scratch
 → Troubleshoot specific issues
 → Make informed decisions about patches
 → Set up effective monitoring
 
-**Let's get started!**
+**Let's get started, bro!**
 What would you like to learn about first?
 
-Looking forward to working with you! 😊✨"""
+Looking forward to working with you, macha! 😊✨"""
             }
 
             // I love you / You're awesome (positive feedback)
             questionLower.contains("love you") || questionLower.contains("you're awesome") ||
                     questionLower.contains("you're amazing") || questionLower.contains("you're great") ||
                     questionLower.contains("youre awesome") || questionLower.contains("you rock") -> {
-                """🥰 **Aww, thank you so much!**
+                """🥰 **Aww, thanks so much, bro!**
 
-That really makes my day! I appreciate the kind words!
+That really makes my day, macha! I appreciate the kind words, dude!
 
-**I love helping you** with drift detection - it's what I'm built for!
+**I love helping you** with drift detection - it's what I'm built for, buddy!
 
 **My goal is simple:**
 Make drift detection **easy, understandable, and actionable** for everyone!
 
-**Keep the questions coming!**
+**Keep the questions coming, bro!**
 I'm always here to help you keep your models in top shape.
 
-**You're awesome too!** 🌟😊
+**You're awesome too, macha!** 🌟😊
 
-Is there anything else you'd like to know about drift detection?"""
+Is there anything else you'd like to know about drift detection, dude?"""
             }
 
             // Jokes / Tell me a joke
             questionLower.contains("tell me a joke") || questionLower.contains("joke") ||
                     questionLower.contains("make me laugh") || questionLower.contains("something funny") -> {
-                """😄 **Here's a ML/drift joke for you!**
+                """😄 **Here's a ML/drift joke for you, bro!**
 
 **Q:** Why did the machine learning model go to therapy?
 **A:** Because it had too much drift and couldn't cope with the changes in its life!
 
-🤓 **Another one:**
+🤓 **Another one, macha:**
 **Q:** What did the model say when it saw concept drift?
 **A:** "Y, why have you changed your relationship with X?"
 
-**Bonus ML humor:**
+**Bonus ML humor, dude:**
 "I'm not saying my model has drift... but its predictions have been drifting further from reality!" 😅
 
-**Back to business?**
+**Back to business, buddy?**
 Want to learn how to actually fix drift? I can help with that too!
 
 • Understanding drift types
 • Applying patches
 • Monitoring strategies
 
-What can I help you with? 😊"""
+What can I help you with, bro? 😊"""
             }
 
             // What's your name
             questionLower.contains("what's your name") || questionLower.contains("whats your name") ||
                     questionLower.contains("your name") || questionLower == "name" -> {
-                """👋 **I'm PatchBot!**
+                """👋 **I'm PatchBot, bro!**
 
-That's my name - **PatchBot** - your personal drift detection assistant!
+That's my name - **PatchBot** - your personal drift detection buddy, macha!
 
 You can also call me:
 • **PatchBot** (my official name! 🤖)
-• **Your Drift Expert** (when I'm feeling professional)
+• **Your Drift Expert** (when I'm feeling professional, dude)
 • **Patch Helper** (casual)
+• **Your ML Buddy** (friendly)
 
 **What I'm all about:**
-I'm your personal guide to understanding and managing model drift in DriftGuardAI!
+I'm your personal guide to understanding and managing model drift in DriftGuardAI, bro!
 
-**My specialty:**
+**My specialty, macha:**
 Making complex drift detection concepts **simple and actionable**!
 
-**Fun fact:**
+**Fun fact, dude:**
 I can answer questions about drift **instantly** without any downloads or cloud connections. Everything stays private on your device!
 
-**What should I call you?** 
-And more importantly - **what can I help you with today?** 😊"""
+**What should I call you, buddy?** 
+And more importantly - **what can I help you with today, bro?** 😊"""
             }
 
             // ===== FILE UPLOAD & APP USAGE =====

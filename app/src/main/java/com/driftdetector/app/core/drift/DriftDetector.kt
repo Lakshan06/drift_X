@@ -7,6 +7,7 @@ import timber.log.Timber
 import java.time.Instant
 import java.util.*
 import kotlin.math.abs
+import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.sqrt
 
@@ -14,8 +15,8 @@ import kotlin.math.sqrt
  * Core drift detection engine with PSI, KS test, and other algorithms
  */
 class DriftDetector(
-    private val psiThreshold: Double = 0.2,
-    private val ksThreshold: Double = 0.05
+    private val psiThreshold: Double = 0.35,  // Increased from 0.2 to reduce false positives
+    private val ksThreshold: Double = 0.10     // Increased from 0.05 to reduce false positives
 ) {
 
     /**
@@ -28,13 +29,17 @@ class DriftDetector(
         featureNames: List<String>
     ): DriftResult = withContext(Dispatchers.Default) {
         try {
+            // Normalize data to prevent scale issues
+            val normalizedRef = normalizeData(referenceData)
+            val normalizedCur = normalizeData(currentData)
+
             val featureDrifts = mutableListOf<FeatureDrift>()
             val statisticalTests = mutableListOf<StatisticalTestResult>()
 
             // Detect drift for each feature
             for (featureIdx in featureNames.indices) {
-                val refFeature = referenceData.map { it[featureIdx].toDouble() }
-                val curFeature = currentData.map { it[featureIdx].toDouble() }
+                val refFeature = normalizedRef.map { it[featureIdx].toDouble() }
+                val curFeature = normalizedCur.map { it[featureIdx].toDouble() }
 
                 val psi = calculatePSI(refFeature, curFeature)
                 val ksResult = performKSTest(refFeature, curFeature)
@@ -62,8 +67,8 @@ class DriftDetector(
                 statisticalTests.add(ksResult)
             }
 
-            // Calculate overall drift score (average PSI)
-            val overallDriftScore = featureDrifts.map { it.psiScore ?: 0.0 }.average()
+            // Calculate overall drift score with weighted average
+            val overallDriftScore = calculateWeightedDriftScore(featureDrifts)
             val isDriftDetected = featureDrifts.any { it.isDrifted }
 
             // Determine drift type
@@ -84,6 +89,56 @@ class DriftDetector(
             Timber.e(e, "Drift detection failed")
             throw e
         }
+    }
+
+    /**
+     * Normalize data to prevent scale issues
+     */
+    private fun normalizeData(data: List<FloatArray>): List<FloatArray> {
+        if (data.isEmpty()) return data
+
+        val numFeatures = data.first().size
+        val normalizedData = mutableListOf<FloatArray>()
+
+        // Calculate mean and std for each feature
+        for (sample in data) {
+            val normalized = FloatArray(numFeatures)
+            for (i in 0 until numFeatures) {
+                val featureValues = data.map { it[i].toDouble() }
+                val mean = featureValues.average()
+                val std = calculateStd(
+                    featureValues,
+                    mean
+                ).coerceAtLeast(1e-6) // Prevent division by zero
+
+                normalized[i] = ((sample[i] - mean) / std).toFloat()
+            }
+            normalizedData.add(normalized)
+        }
+
+        return normalizedData
+    }
+
+    /**
+     * Calculate weighted drift score (gives more weight to features with higher drift)
+     */
+    private fun calculateWeightedDriftScore(featureDrifts: List<FeatureDrift>): Double {
+        if (featureDrifts.isEmpty()) return 0.0
+
+        // Use exponential weighting to emphasize high-drift features
+        val weights = featureDrifts.map { drift ->
+            val normalizedScore = (drift.psiScore ?: 0.0) / psiThreshold
+            exp(normalizedScore)
+        }
+
+        val totalWeight = weights.sum()
+        if (totalWeight == 0.0) return 0.0
+
+        val weightedSum = featureDrifts.zip(weights).sumOf { (drift, weight) ->
+            (drift.psiScore ?: 0.0) * weight
+        }
+
+        return weightedSum / totalWeight
     }
 
     /**
@@ -231,6 +286,7 @@ class DriftDetector(
 
     /**
      * Determine the type of drift based on feature analysis
+     * Enhanced logic to distinguish between different drift types
      */
     private fun determineDriftType(
         featureDrifts: List<FeatureDrift>,
@@ -238,14 +294,93 @@ class DriftDetector(
     ): DriftType {
         if (!isDriftDetected) return DriftType.NO_DRIFT
 
-        // Simple heuristic: if many features drift, it's covariate drift
-        val driftedCount = featureDrifts.count { it.isDrifted }
-        val driftRatio = driftedCount.toDouble() / featureDrifts.size
+        val driftedFeatures = featureDrifts.filter { it.isDrifted }
+        if (driftedFeatures.isEmpty()) return DriftType.NO_DRIFT
 
+        val driftedCount = driftedFeatures.size
+        val totalCount = featureDrifts.size
+        val driftRatio = driftedCount.toDouble() / totalCount
+
+        // Analyze distribution shift patterns
+        val meanShifts = driftedFeatures.map { abs(it.distributionShift.meanShift) }
+        val stdShifts = driftedFeatures.map { abs(it.distributionShift.stdShift) }
+
+        val avgMeanShift = meanShifts.average()
+        val avgStdShift = stdShifts.average()
+
+        // Check if distribution shapes changed (std shift) vs just location (mean shift)
+        val shapeChangeRatio = if (avgMeanShift > 0.01) avgStdShift / avgMeanShift else avgStdShift
+
+        // Check consistency of drift across features
+        val driftScores = driftedFeatures.map { it.driftScore }
+        val avgDriftScore = driftScores.average()
+        val driftVariance =
+            driftScores.map { (it - avgDriftScore) * (it - avgDriftScore) }.average()
+        val driftConsistency =
+            if (avgDriftScore > 0.01) sqrt(driftVariance) / avgDriftScore else 0.0
+
+        Timber.d("🔍 Drift Analysis: ratio=$driftRatio, avgMean=$avgMeanShift, avgStd=$avgStdShift, shapeChange=$shapeChangeRatio, consistency=$driftConsistency")
+
+        // IMPROVED LOGIC: More accurate drift type detection
         return when {
-            driftRatio > 0.5 -> DriftType.COVARIATE_DRIFT
-            driftRatio > 0.2 -> DriftType.CONCEPT_DRIFT
-            else -> DriftType.PRIOR_DRIFT
+            // PRIOR_DRIFT: Output distribution changed
+            // - Very few features drifted (< 20%)
+            // - Localized drift (mean shift dominates)
+            // - High consistency in affected features
+            driftRatio < 0.20 && avgMeanShift > avgStdShift * 2.0 && driftConsistency < 0.5 -> {
+                Timber.d("✅ Detected PRIOR_DRIFT: Few features ($driftRatio), localized shifts, consistent")
+                DriftType.PRIOR_DRIFT
+            }
+
+            // CONCEPT_DRIFT: Relationship between X and Y changed
+            // - Moderate feature drift (20-50%)
+            // - High inconsistency OR significant shape changes
+            driftRatio in 0.20..0.50 && (driftConsistency > 0.5 || shapeChangeRatio > 2.0) -> {
+                Timber.d("✅ Detected CONCEPT_DRIFT: Moderate ratio ($driftRatio), inconsistent or shape change")
+                DriftType.CONCEPT_DRIFT
+            }
+
+            // CONCEPT_DRIFT: Very inconsistent patterns
+            // - Drift patterns vary wildly across features
+            driftConsistency > 0.7 -> {
+                Timber.d("✅ Detected CONCEPT_DRIFT: High inconsistency ($driftConsistency)")
+                DriftType.CONCEPT_DRIFT
+            }
+
+            // COVARIATE_DRIFT: Input feature distributions changed
+            // - Many features drifted (> 50%)
+            // - Consistent drift patterns across features
+            driftRatio > 0.50 && driftConsistency < 0.5 -> {
+                Timber.d("✅ Detected COVARIATE_DRIFT: Many features ($driftRatio), consistent patterns")
+                DriftType.COVARIATE_DRIFT
+            }
+
+            // COVARIATE_DRIFT: Significant comprehensive shifts
+            // - INCREASED THRESHOLD from 0.1 to 0.3 (less sensitive)
+            // - Both mean and variance shifts are substantial
+            avgMeanShift > 0.3 && avgStdShift > 0.3 -> {
+                Timber.d("✅ Detected COVARIATE_DRIFT: Significant mean ($avgMeanShift) and std ($avgStdShift) shifts")
+                DriftType.COVARIATE_DRIFT
+            }
+
+            // Use drift ratio as final tiebreaker
+            // - Prioritize based on percentage of drifted features
+            driftRatio > 0.40 -> {
+                Timber.d("✅ Detected COVARIATE_DRIFT: High drift ratio ($driftRatio)")
+                DriftType.COVARIATE_DRIFT
+            }
+
+            driftRatio > 0.20 -> {
+                Timber.d("✅ Detected CONCEPT_DRIFT: Moderate drift ratio ($driftRatio)")
+                DriftType.CONCEPT_DRIFT
+            }
+
+            // Default to prior drift for edge cases with low feature involvement
+            else -> {
+                Timber.d("✅ Default to PRIOR_DRIFT: Low drift ratio ($driftRatio)")
+                DriftType.PRIOR_DRIFT
+            }
         }
     }
+
 }

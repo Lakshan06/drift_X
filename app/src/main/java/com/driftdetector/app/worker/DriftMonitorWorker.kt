@@ -106,10 +106,46 @@ class DriftMonitorWorker(
                 featureNames = model.inputFeatures
             )
 
-            Timber.d("Drift detection completed: drift=${driftResult.isDriftDetected}, score=${driftResult.driftScore}")
+            Timber.d("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            Timber.d("📊 DRIFT DETECTION RESULTS")
+            Timber.d("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            Timber.d("Model: ${model.name}")
+            Timber.d("Drift Type: ${driftResult.driftType}")
+            Timber.d("Drift Detected: ${driftResult.isDriftDetected}")
+            Timber.d("Drift Score: ${String.format("%.4f", driftResult.driftScore)}")
+            Timber.d("Threshold: ${driftResult.threshold}")
+
+            if (driftResult.isDriftDetected) {
+                Timber.d("\n🔍 Drifted Features:")
+                driftResult.featureDrifts.filter { it.isDrifted }.forEach { drift ->
+                    Timber.d("   • ${drift.featureName} (idx=${drift.featureIndex}):")
+                    Timber.d("      PSI Score: ${String.format("%.4f", drift.psiScore)}")
+                    Timber.d("      KS Statistic: ${String.format("%.4f", drift.ksStatistic)}")
+                    Timber.d("      P-Value: ${String.format("%.4f", drift.pValue)}")
+                    Timber.d(
+                        "      Mean Shift: ${
+                            String.format(
+                                "%.4f",
+                                drift.distributionShift.meanShift
+                            )
+                        }"
+                    )
+                    Timber.d(
+                        "      Std Shift: ${
+                            String.format(
+                                "%.4f",
+                                drift.distributionShift.stdShift
+                            )
+                        }"
+                    )
+                }
+            }
+            Timber.d("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
             // If drift detected, synthesize and validate patch
             if (driftResult.isDriftDetected && driftResult.driftScore > 0.3) {
+                Timber.d("🔧 Synthesizing patch for detected drift...")
+
                 val patch = repository.synthesizePatch(
                     modelId = modelId,
                     driftResult = driftResult,
@@ -117,7 +153,7 @@ class DriftMonitorWorker(
                     currentData = currentData
                 )
 
-                Timber.d("Patch synthesized: ${patch.patchType}")
+                Timber.d("✅ Patch synthesized: ${patch.patchType}")
 
                 // Validate patch (with mock validation data in production)
                 val validationData = currentData.takeLast(20)
@@ -130,12 +166,14 @@ class DriftMonitorWorker(
                 )
 
                 if (validationResult.isValid) {
-                    Timber.d("Patch validated successfully, ready for application")
+                    Timber.d("✅ Patch validated successfully, ready for application")
                     // Send notification to user
                     showDriftNotification(modelId, driftResult.driftScore)
                 } else {
-                    Timber.w("Patch validation failed: ${validationResult.errors}")
+                    Timber.w("⚠️ Patch validation failed: ${validationResult.errors}")
                 }
+            } else {
+                Timber.d("ℹ️ No significant drift detected or score below threshold")
             }
 
             // Cleanup old data

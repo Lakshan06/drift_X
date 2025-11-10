@@ -1,10 +1,12 @@
 package com.driftdetector.app.presentation.screen
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -36,7 +39,8 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DriftDashboardScreen(
-    viewModel: DriftDashboardViewModel = koinViewModel()
+    viewModel: DriftDashboardViewModel = koinViewModel(),
+    onNavigateToInstantDriftFix: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val patchGenerationState by viewModel.patchGenerationState.collectAsState()
@@ -95,7 +99,17 @@ fun DriftDashboardScreen(
                 }
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) {
+            Snackbar(
+                snackbarData = it,
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                actionColor = MaterialTheme.colorScheme.primary,
+                dismissActionContentColor = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(8.dp),
+                shape = MaterialTheme.shapes.medium
+            )
+        } }
     ) { padding ->
         when (val state = uiState) {
             is DriftDashboardState.Loading -> LoadingScreen()
@@ -107,24 +121,24 @@ fun DriftDashboardScreen(
                         .padding(padding)
                 ) {
                     // Tab navigation
-                    TabRow(selectedTabIndex = selectedTab) {
+                    TabRow(selectedTabIndex = selectedTab, containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface) {
                         Tab(
                             selected = selectedTab == 0,
                             onClick = { selectedTab = 0 },
-                            text = { Text("Overview") },
-                            icon = { Icon(Icons.Default.Dashboard, null) }
+                            text = { Text("Overview", color = if (selectedTab == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium) },
+                            icon = { Icon(Icons.Default.Dashboard, "Overview tab", tint = if (selectedTab == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
                         )
                         Tab(
                             selected = selectedTab == 1,
                             onClick = { selectedTab = 1 },
-                            text = { Text("Analytics") },
-                            icon = { Icon(Icons.Default.Analytics, null) }
+                            text = { Text("Analytics", color = if (selectedTab == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium) },
+                            icon = { Icon(Icons.Default.Analytics, "Analytics tab", tint = if (selectedTab == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
                         )
                         Tab(
                             selected = selectedTab == 2,
                             onClick = { selectedTab = 2 },
-                            text = { Text("Alerts") },
-                            icon = { Icon(Icons.Default.Notifications, null) }
+                            text = { Text("Alerts", color = if (selectedTab == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Medium) },
+                            icon = { Icon(Icons.Default.Notifications, "Alerts tab", tint = if (selectedTab == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
                         )
                     }
 
@@ -135,7 +149,8 @@ fun DriftDashboardScreen(
                             onDriftClick = {
                                 selectedDriftResult = it
                                 showAIExplanation = true
-                            }
+                            },
+                            onNavigateToInstantDriftFix = onNavigateToInstantDriftFix
                         )
 
                         1 -> AnalyticsTab(state = state)
@@ -163,66 +178,186 @@ fun DriftDashboardScreen(
 @Composable
 fun OverviewTab(
     state: DriftDashboardState.Success,
-    onDriftClick: (DriftResult) -> Unit
+    onDriftClick: (DriftResult) -> Unit,
+    onNavigateToInstantDriftFix: () -> Unit = {}
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Real-time Metrics Summary
+        // Real-time Metrics Summary with fade in animation
         item {
-            MetricsSummaryCard(state)
-        }
-
-        // Drift Gauge - Current Status
-        item {
-            val latestDrift = state.driftResults.firstOrNull()
-            if (latestDrift != null) {
-                DriftStatusGaugeCard(latestDrift)
+            SlideInFromSide(visible = true, delayMillis = 0, fromLeft = true) {
+                MetricsSummaryCard(state)
             }
         }
 
-        // Drift Timeline Chart
+        // Quick action button for Instant Drift Fix
         item {
-            DriftTimelineCard(state.driftResults)
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Button(
+                    onClick = onNavigateToInstantDriftFix,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    ),
+                    modifier = Modifier.padding(vertical = 8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Build,
+                        contentDescription = "Instant Drift Fix",
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "Instant Drift Fix",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
 
-        // Feature Drift Heatmap
+        // Drift Gauge - Current Status with animation
+        item {
+            val latestDrift = state.driftResults.firstOrNull()
+            if (latestDrift != null) {
+                SlideInFromSide(visible = true, delayMillis = 100, fromLeft = false) {
+                    DriftStatusGaugeCard(latestDrift)
+                }
+            }
+        }
+
+        // Drift Timeline Chart with animation
+        item {
+            SlideInFromSide(visible = true, delayMillis = 200, fromLeft = true) {
+                DriftTimelineCard(state.driftResults)
+            }
+        }
+
+        // Feature Drift Heatmap with animation
         item {
             val latestDrift = state.driftResults.firstOrNull()
             if (latestDrift != null && latestDrift.featureDrifts.isNotEmpty()) {
-                DriftHeatmapCard(latestDrift)
+                SlideInFromSide(visible = true, delayMillis = 300, fromLeft = false) {
+                    DriftHeatmapCard(latestDrift)
+                }
             }
         }
 
         // Recent Drift Events
         item {
-            Text(
-                "Recent Drift Events",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 8.dp)
-            )
+            FadeInCard(visible = true, delayMillis = 400) {
+                Text(
+                    "Recent Drift Events",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
         }
 
         items(state.driftResults.take(10)) { drift ->
-            InteractiveDriftCard(
-                driftResult = drift,
-                onClick = { onDriftClick(drift) }
-            )
+            FadeInCard(visible = true, delayMillis = 450) {
+                InteractiveDriftCard(
+                    driftResult = drift,
+                    onClick = { onDriftClick(drift) }
+                )
+            }
         }
+    }
+}
+
+// Animation composables for card sliding/fading
+@Composable
+fun SlideInFromSide(
+    visible: Boolean,
+    delayMillis: Int = 0,
+    fromLeft: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    val enterTransition = if (fromLeft) {
+        slideInHorizontally(
+            initialOffsetX = { fullWidth -> -fullWidth / 3 },
+            animationSpec = tween(durationMillis = 500, delayMillis = delayMillis)
+        ) + fadeIn(animationSpec = tween(durationMillis = 500, delayMillis = delayMillis))
+    } else {
+        slideInHorizontally(
+            initialOffsetX = { fullWidth -> fullWidth / 3 },
+            animationSpec = tween(durationMillis = 500, delayMillis = delayMillis)
+        ) + fadeIn(animationSpec = tween(durationMillis = 500, delayMillis = delayMillis))
+    }
+    AnimatedVisibility(
+        visible = visible,
+        enter = enterTransition,
+        exit = fadeOut()
+    ) {
+        content()
+    }
+}
+
+@Composable
+fun FadeInCard(
+    visible: Boolean,
+    delayMillis: Int = 0,
+    content: @Composable () -> Unit
+) {
+    val enter = fadeIn(animationSpec = tween(durationMillis = 500, delayMillis = delayMillis))
+    AnimatedVisibility(
+        visible = visible,
+        enter = enter,
+        exit = fadeOut()
+    ) {
+        content()
     }
 }
 
 @Composable
 fun AnalyticsTab(state: DriftDashboardState.Success) {
+    // Add safety check for empty data
+    if (state.driftResults.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Analytics,
+                    contentDescription = "No analytics data",
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "No Analytics Data",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Analytics will appear here once drift detection runs",
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        return
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Feature Attribution Analysis
+        // Feature Attribution Analysis - with null safety
         item {
             val latestDrift = state.driftResults.firstOrNull()
             if (latestDrift != null && latestDrift.featureDrifts.isNotEmpty()) {
@@ -230,12 +365,14 @@ fun AnalyticsTab(state: DriftDashboardState.Success) {
             }
         }
 
-        // Drift Distribution by Type
+        // Drift Distribution by Type - with null safety
         item {
-            DriftTypeDistributionCard(state.driftResults)
+            if (state.driftResults.isNotEmpty()) {
+                DriftTypeDistributionCard(state.driftResults)
+            }
         }
 
-        // Statistical Tests Results
+        // Statistical Tests Results - with null safety
         item {
             val latestDrift = state.driftResults.firstOrNull()
             if (latestDrift != null && latestDrift.statisticalTests.isNotEmpty()) {
@@ -243,9 +380,11 @@ fun AnalyticsTab(state: DriftDashboardState.Success) {
             }
         }
 
-        // Drift Trends
+        // Drift Trends - with null safety
         item {
-            DriftTrendsCard(state.driftResults)
+            if (state.driftResults.isNotEmpty()) {
+                DriftTrendsCard(state.driftResults)
+            }
         }
     }
 }
@@ -307,6 +446,77 @@ fun AlertsTab(state: DriftDashboardState.Success) {
 
 // ========== Card Components ==========
 
+// --- Animated Counter Composables & Effects ---
+
+@Composable
+fun AnimatedCounter(
+    count: Int,
+    style: androidx.compose.ui.text.TextStyle,
+    modifier: Modifier = Modifier,
+    color: Color? = null
+) {
+    var animatedCount by remember { mutableStateOf(0) }
+    val animatedValue = animateIntAsState(
+        targetValue = count,
+        animationSpec = tween(durationMillis = 1200, easing = FastOutSlowInEasing)
+    )
+    LaunchedEffect(count) {
+        animatedCount = count
+    }
+    Text(
+        text = animatedValue.value.toString(),
+        style = style,
+        fontWeight = FontWeight.Bold,
+        color = color ?: MaterialTheme.colorScheme.onPrimaryContainer,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun AnimatedNumberRoll(
+    number: Float,
+    decimals: Int,
+    style: androidx.compose.ui.text.TextStyle,
+    modifier: Modifier = Modifier,
+    color: Color? = null
+) {
+    val animated by animateFloatAsState(
+        targetValue = number,
+        animationSpec = tween(durationMillis = 1200, easing = FastOutSlowInEasing)
+    )
+    Text(
+        text = "%.${decimals}f".format(animated),
+        style = style,
+        fontWeight = FontWeight.Bold,
+        color = color ?: MaterialTheme.colorScheme.onPrimaryContainer,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun PulsingEffect(
+    modifier: Modifier = Modifier,
+    minScale: Float = 0.98f,
+    maxScale: Float = 1.02f,
+    durationMillis: Int = 2000,
+    content: @Composable (Modifier) -> Unit
+) {
+    val transition = rememberInfiniteTransition(label = "PulseAnim")
+    val scale by transition.animateFloat(
+        initialValue = minScale,
+        targetValue = maxScale,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "PulseAnimVal"
+    )
+    content(modifier.graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+    })
+}
+
 @Composable
 fun MetricsSummaryCard(state: DriftDashboardState.Success) {
     Card(
@@ -330,8 +540,9 @@ fun MetricsSummaryCard(state: DriftDashboardState.Success) {
                     )
                     Text(
                         text = "Model Performance Overview",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.95f)
                     )
                 }
 
@@ -381,7 +592,7 @@ fun MetricsSummaryCard(state: DriftDashboardState.Success) {
                     value = String.format("%.3f", avgDrift),
                     icon = Icons.Default.ShowChart,
                     color = MaterialTheme.colorScheme.tertiary,
-                    tooltip = "Average drift score across all monitoring periods"
+                    tooltip = "Average drift score: ${String.format("%.4f", avgDrift)}\nCalculated across ${state.driftResults.size} monitoring periods\n\nThis metric helps track overall model stability over time."
                 )
             }
         }
@@ -402,60 +613,152 @@ fun MetricBox(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .padding(8.dp)
-            .clickable { if (tooltip != null) showTooltip = !showTooltip }
-    ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(color.copy(alpha = 0.2f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(24.dp)
+            .clickable(
+                enabled = tooltip != null,
+                onClick = { showTooltip = !showTooltip }
             )
+    ) {
+        // Pulsing icon for critical metrics
+        PulsingEffect(
+            modifier = Modifier,
+            minScale = 0.98f,
+            maxScale = 1.02f,
+            durationMillis = 2000
+        ) { mod ->
+            Box(
+                modifier = mod
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = 0.3f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = "$label metric",
+                    tint = color,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
         }
         Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onPrimaryContainer
-        )
+
+        // Animated number display
+        val numberValue = value.toIntOrNull()
+        if (numberValue != null) {
+            AnimatedCounter(
+                count = numberValue,
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier
+            )
+        } else {
+            // For decimal numbers like drift scores
+            val floatValue = value.toFloatOrNull()
+            if (floatValue != null) {
+                AnimatedNumberRoll(
+                    number = floatValue,
+                    decimals = 3,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            } else {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
             )
             if (tooltip != null) {
                 Spacer(modifier = Modifier.width(4.dp))
                 Icon(
                     Icons.Default.Info,
-                    contentDescription = "Info",
-                    modifier = Modifier.size(12.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f)
+                    contentDescription = "Tap for details",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                 )
             }
         }
 
-        // Tooltip overlay
+        // Tooltip overlay - Shows detailed information when tapped
         if (showTooltip && tooltip != null) {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Surface(
-                color = MaterialTheme.colorScheme.inverseSurface,
-                shape = MaterialTheme.shapes.small,
-                tonalElevation = 8.dp
+                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.medium,
+                tonalElevation = 8.dp,
+                shadowElevation = 8.dp,
+                modifier = Modifier.padding(horizontal = 8.dp)
             ) {
-                Text(
-                    text = tooltip,
-                    modifier = Modifier.padding(8.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.inverseOnSurface
-                )
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .widthIn(max = 280.dp)
+                ) {
+                    // Parse and display tooltip data
+                    val lines = tooltip.split("\n")
+                    lines.forEach { line ->
+                        when {
+                            line.contains("Average drift score:") -> {
+                                Text(
+                                    text = "📊 Detailed Metrics",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                                Text(
+                                    text = line,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.4f
+                                )
+                            }
+
+                            line.contains("Calculated across") -> {
+                                Text(
+                                    text = line,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = MaterialTheme.typography.bodySmall.lineHeight * 1.4f
+                                )
+                            }
+
+                            line.contains("This metric helps") -> {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = line,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = MaterialTheme.typography.bodySmall.lineHeight * 1.5f,
+                                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                )
+                            }
+
+                            line.isNotBlank() -> {
+                                Text(
+                                    text = line,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.4f
+                                )
+                            }
+                        }
+                        if (line.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+                    }
+                }
             }
         }
     }
@@ -463,7 +766,12 @@ fun MetricBox(
 
 @Composable
 fun DriftStatusGaugeCard(driftResult: DriftResult) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
         Column(
             modifier = Modifier.padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -471,7 +779,8 @@ fun DriftStatusGaugeCard(driftResult: DriftResult) {
             Text(
                 text = "Current Drift Status",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -491,14 +800,14 @@ fun DriftStatusGaugeCard(driftResult: DriftResult) {
                 else -> Color(0xFF4CAF50)
             }
 
-            // Visual Drift Level Badge
+            // Visual Drift Level Badge with better contrast
             Surface(
                 shape = MaterialTheme.shapes.medium,
-                color = driftColor.copy(alpha = 0.2f),
+                color = driftColor.copy(alpha = 0.15f),
                 modifier = Modifier.padding(8.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
@@ -507,10 +816,11 @@ fun DriftStatusGaugeCard(driftResult: DriftResult) {
                         fontWeight = FontWeight.Bold,
                         color = driftColor
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Score: ${String.format("%.3f", driftResult.driftScore)}",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
                         color = driftColor
                     )
                 }
@@ -526,47 +836,71 @@ fun DriftStatusGaugeCard(driftResult: DriftResult) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Business Impact Explanation
+            // Business Impact Explanation with better contrast
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Default.Info,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(20.dp)
+                            contentDescription = "Drift explanation",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "What does this mean?",
-                            style = MaterialTheme.typography.titleSmall,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.secondary
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = getDriftExplanation(driftLevel, driftResult.driftType),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.5f
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Action recommendation
-            Text(
-                text = getActionRecommendation(driftLevel),
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
+            // Action recommendation with better visibility
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = when (driftLevel) {
+                            "HIGH" -> Icons.Default.Warning
+                            "MODERATE" -> Icons.Default.Info
+                            else -> Icons.Default.CheckCircle
+                        },
+                        contentDescription = "Drift status: $driftLevel",
+                        tint = driftColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = getActionRecommendation(driftLevel),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.4f
+                    )
+                }
+            }
         }
     }
 }
@@ -660,12 +994,18 @@ fun FeatureAttributionCard(driftResult: DriftResult) {
 
 @Composable
 fun DriftTypeDistributionCard(driftResults: List<DriftResult>) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(
                 text = "Drift Type Distribution",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
@@ -686,12 +1026,14 @@ fun DriftTypeDistributionCard(driftResults: List<DriftResult>) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = type.name.replace("_", " "),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "$count occurrences",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -703,8 +1045,9 @@ fun DriftTypeDistributionCard(driftResults: List<DriftResult>) {
                         Text(
                             text = String.format("%.1f%%", percentage),
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                 }
@@ -788,19 +1131,22 @@ fun StatisticalTestRow(testName: String, statistic: Double, pValue: Double, isPa
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = testName,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
             )
             Row {
                 Text(
                     text = "Statistic: ${String.format("%.4f", statistic)}",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
                     text = "p-value: ${String.format("%.4f", pValue)}",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -808,9 +1154,9 @@ fun StatisticalTestRow(testName: String, statistic: Double, pValue: Double, isPa
 
         Icon(
             imageVector = if (isPassed) Icons.Default.CheckCircle else Icons.Default.Error,
-            contentDescription = null,
+            contentDescription = if (isPassed) "Test passed" else "Test failed",
             tint = if (isPassed) Color(0xFF4CAF50) else Color(0xFFF44336),
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(28.dp)
         )
     }
 }
@@ -821,8 +1167,9 @@ fun DriftTrendsCard(driftResults: List<DriftResult>) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(
                 text = "Drift Trends & Insights",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
@@ -884,23 +1231,25 @@ fun InsightRow(
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = null,
+            contentDescription = "$label trend",
             tint = color,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(28.dp)
         )
         Spacer(modifier = Modifier.width(12.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
         Surface(
             shape = MaterialTheme.shapes.small,
-            color = color.copy(alpha = 0.2f)
+            color = color.copy(alpha = 0.15f)
         ) {
             Text(
                 text = value,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 color = color
@@ -924,8 +1273,11 @@ fun InteractiveDriftCard(
         colors = CardDefaults.cardColors(
             containerColor = if (driftResult.isDriftDetected) {
                 when {
-                    driftResult.driftScore > 0.5 -> MaterialTheme.colorScheme.errorContainer
-                    else -> MaterialTheme.colorScheme.tertiaryContainer
+                    driftResult.driftScore > 0.5 -> MaterialTheme.colorScheme.errorContainer.copy(
+                        alpha = 0.3f
+                    )
+
+                    else -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
                 }
             } else {
                 MaterialTheme.colorScheme.surfaceVariant
@@ -946,23 +1298,26 @@ fun InteractiveDriftCard(
                             imageVector = if (driftResult.driftScore > 0.5)
                                 Icons.Default.Error
                             else Icons.Default.Warning,
-                            contentDescription = "Drift detected",
+                            contentDescription = "Drift severity indicator",
                             tint = if (driftResult.driftScore > 0.5)
                                 MaterialTheme.colorScheme.error
                             else Color(0xFFFF9800),
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
                     Text(
                         text = driftResult.driftType.name.replace("_", " "),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Medium
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = formattedDate,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
@@ -981,7 +1336,7 @@ fun InteractiveDriftCard(
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = String.format("%.3f", driftResult.driftScore),
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Bold,
                     color = when {
                         driftResult.driftScore > 0.5 -> MaterialTheme.colorScheme.error
@@ -991,8 +1346,9 @@ fun InteractiveDriftCard(
                 )
                 Text(
                     text = "Drift Score",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
         }
@@ -1051,28 +1407,29 @@ fun AlertMetric(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
-                .size(56.dp)
+                .size(60.dp)
                 .clip(CircleShape)
-                .background(color.copy(alpha = 0.2f)),
+                .background(color.copy(alpha = 0.25f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = null,
+                contentDescription = "$label alerts",
                 tint = color,
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(34.dp)
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = count.toString(),
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.displaySmall,
             fontWeight = FontWeight.Bold,
             color = color
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onPrimaryContainer
         )
     }
@@ -1088,9 +1445,9 @@ fun AlertCard(driftResult: DriftResult, level: AlertLevel) {
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = when (level) {
-                AlertLevel.CRITICAL -> MaterialTheme.colorScheme.errorContainer
-                AlertLevel.WARNING -> Color(0xFFFF9800).copy(alpha = 0.1f)
-                AlertLevel.INFO -> MaterialTheme.colorScheme.primaryContainer
+                AlertLevel.CRITICAL -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                AlertLevel.WARNING -> Color(0xFFFF9800).copy(alpha = 0.12f)
+                AlertLevel.INFO -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
             }
         )
     ) {
@@ -1107,24 +1464,26 @@ fun AlertCard(driftResult: DriftResult, level: AlertLevel) {
                             AlertLevel.WARNING -> Icons.Default.Warning
                             AlertLevel.INFO -> Icons.Default.Info
                         },
-                        contentDescription = null,
+                        contentDescription = "Alert severity: ${level.name}",
                         tint = when (level) {
                             AlertLevel.CRITICAL -> MaterialTheme.colorScheme.error
                             AlertLevel.WARNING -> Color(0xFFFF9800)
                             AlertLevel.INFO -> MaterialTheme.colorScheme.primary
                         },
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(28.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
                             text = driftResult.driftType.name.replace("_", " "),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = formattedDate,
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -1141,7 +1500,7 @@ fun AlertCard(driftResult: DriftResult, level: AlertLevel) {
                     Text(
                         text = String.format("%.3f", driftResult.driftScore),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -1152,8 +1511,9 @@ fun AlertCard(driftResult: DriftResult, level: AlertLevel) {
 
             Text(
                 text = "Top affected features:",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -1170,12 +1530,15 @@ fun AlertCard(driftResult: DriftResult, level: AlertLevel) {
                     ) {
                         Text(
                             text = "• ${feature.featureName}",
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = String.format("%.3f", feature.driftScore),
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -1187,7 +1550,11 @@ fun AlertCard(driftResult: DriftResult, level: AlertLevel) {
                 horizontalArrangement = Arrangement.End
             ) {
                 TextButton(onClick = { /* View Details */ }) {
-                    Text("View Details")
+                    Text(
+                        "View Details",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
@@ -1197,11 +1564,15 @@ fun AlertCard(driftResult: DriftResult, level: AlertLevel) {
                 ) {
                     Icon(
                         Icons.Default.Build,
-                        contentDescription = null,
+                        contentDescription = "Generate patch",
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Generate Patch")
+                    Text(
+                        "Generate Patch",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -1229,7 +1600,7 @@ fun AIExplanationSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Default.SmartToy,
-                    contentDescription = null,
+                    contentDescription = "AI assistant",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp)
                 )
@@ -1268,7 +1639,7 @@ fun AIExplanationSheet(
                 ) {
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
+                        contentDescription = "Recommended action",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
@@ -1358,7 +1729,7 @@ fun EmptyDashboardScreen() {
         ) {
             Icon(
                 imageVector = Icons.Default.Dashboard,
-                contentDescription = null,
+                contentDescription = "No models available",
                 modifier = Modifier.size(80.dp),
                 tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
             )
@@ -1419,3 +1790,7 @@ fun ErrorScreen(message: String) {
         }
     }
 }
+
+
+
+

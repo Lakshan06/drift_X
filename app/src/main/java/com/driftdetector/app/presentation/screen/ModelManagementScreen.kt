@@ -24,7 +24,8 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun ModelManagementScreen(
     viewModel: ModelManagementViewModel = koinViewModel(),
-    onNavigateToUpload: () -> Unit = {}
+    onNavigateToUpload: () -> Unit = {},
+    onNavigateToInstantDriftFix: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
@@ -33,13 +34,15 @@ fun ModelManagementScreen(
         is ModelManagementState.Loading -> LoadingScreen()
         is ModelManagementState.Empty -> EmptyModelsScreen(
             onAddClick = { showAddDialog = true },
-            onUploadClick = onNavigateToUpload
+            onUploadClick = onNavigateToUpload,
+            onInstantDriftFixClick = onNavigateToInstantDriftFix
         )
         is ModelManagementState.Success -> ModelListContent(
             models = state.models,
             onDeactivate = { viewModel.deactivateModel(it) },
             onAddClick = { showAddDialog = true },
-            onUploadClick = onNavigateToUpload
+            onUploadClick = onNavigateToUpload,
+            onInstantDriftFixClick = onNavigateToInstantDriftFix
         )
         is ModelManagementState.Error -> ErrorScreen(state.message)
     }
@@ -61,7 +64,8 @@ fun ModelListContent(
     models: List<MLModel>,
     onDeactivate: (String) -> Unit,
     onAddClick: () -> Unit,
-    onUploadClick: () -> Unit
+    onUploadClick: () -> Unit,
+    onInstantDriftFixClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -88,6 +92,15 @@ fun ModelListContent(
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                 ) {
                     Icon(Icons.Default.CloudUpload, contentDescription = "Upload Model")
+                }
+
+                // Instant Drift Fix button
+                FloatingActionButton(
+                    onClick = onInstantDriftFixClick,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                ) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = "Instant Drift Fix")
                 }
 
                 // Register button
@@ -278,7 +291,7 @@ fun ModelCard(
                 if (model.isActive) {
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Active",
+                        contentDescription = "Model is active",
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -331,7 +344,8 @@ fun InfoRow(label: String, value: String) {
 @Composable
 fun EmptyModelsScreen(
     onAddClick: () -> Unit,
-    onUploadClick: () -> Unit
+    onUploadClick: () -> Unit,
+    onInstantDriftFixClick: () -> Unit
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -343,7 +357,7 @@ fun EmptyModelsScreen(
         ) {
             Icon(
                 imageVector = Icons.Default.CloudUpload,
-                contentDescription = null,
+                contentDescription = "No models registered",
                 modifier = Modifier.size(64.dp),
                 tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
             )
@@ -366,9 +380,21 @@ fun EmptyModelsScreen(
                 onClick = onUploadClick,
                 modifier = Modifier.fillMaxWidth(0.8f)
             ) {
-                Icon(Icons.Default.CloudUpload, contentDescription = null)
+                Icon(Icons.Default.CloudUpload, contentDescription = "Upload Model")
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Upload Model & Data")
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Instant Drift Fix button
+            Button(
+                onClick = onInstantDriftFixClick,
+                modifier = Modifier.fillMaxWidth(0.8f)
+            ) {
+                Icon(Icons.Default.CheckCircle, contentDescription = "Instant Drift Fix")
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Instant Drift Fix")
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -378,7 +404,7 @@ fun EmptyModelsScreen(
                 onClick = onAddClick,
                 modifier = Modifier.fillMaxWidth(0.8f)
             ) {
-                Icon(Icons.Default.Add, contentDescription = null)
+                Icon(Icons.Default.Add, contentDescription = "Register Model")
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Register Existing Model")
             }

@@ -1,36 +1,252 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App Name -->
     <string name="app_name">DriftGuardAI</string>
 
-    <!-- SciChart License Key (for development, can be empty) -->
+    <!-- SciChart License Key -->
     <string name="sciChart_license"></string>
 
+    <!-- Common Actions -->
+    <string name="action_ok">OK</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_close">Close</string>
+    <string name="action_dismiss">Dismiss</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_continue">Continue</string>
+    <string name="action_back">Back</string>
+    <string name="action_skip">Skip</string>
+    <string name="action_next">Next</string>
+    <string name="action_save">Save</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_share">Share</string>
+    <string name="action_export">Export</string>
+    <string name="action_import">Import</string>
+    <string name="action_search">Search</string>
+    <string name="action_filter">Filter</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_apply">Apply</string>
+
     <!-- Dashboard -->
-    <string name="dashboard_title">Drift Dashboard</string>
-    <string name="no_models">No active models</string>
-    <string name="register_model">Register a model to start monitoring</string>
-
-    <!-- Drift Detection -->
-    <string name="drift_detected">Drift Detected</string>
-    <string name="no_drift">No Drift</string>
-    <string name="drift_score">Drift Score</string>
-
-    <!-- Patches -->
-    <string name="patches_title">Patches</string>
-    <string name="apply_patch">Apply</string>
-    <string name="rollback_patch">Rollback</string>
-    <string name="patch_applied">Patch applied successfully</string>
-    <string name="patch_rolled_back">Patch rolled back successfully</string>
+    <string name="dashboard_title">Drift Monitor Dashboard</string>
+    <string name="dashboard_tab_overview">Overview</string>
+    <string name="dashboard_tab_analytics">Analytics</string>
+    <string name="dashboard_tab_alerts">Alerts</string>
+    <string name="dashboard_loading">Loading dashboard…</string>
+    <string name="dashboard_no_models">No active models</string>
+    <string name="dashboard_register_model">Register a model to start monitoring</string>
+    <string name="dashboard_view">View Dashboard</string>
 
     <!-- Models -->
     <string name="models_title">Models</string>
-    <string name="add_model">Add Model</string>
-    <string name="deactivate_model">Deactivate</string>
+    <string name="models_all">All Models (%1$d)</string>
+    <string name="models_active">Active (%1$d)</string>
+    <string name="models_drifted">Drifted (%1$d)</string>
+    <string name="models_search">Search models…</string>
+    <string name="models_upload">Upload Model &amp; Data</string>
+    <string name="models_register">Register Existing Model</string>
+    <string name="models_register_new">Register New Model</string>
+    <string name="models_deactivate">Deactivate</string>
+    <string name="models_view_details">View Details</string>
+
+    <!-- Model Registration -->
+    <string name="model_name">Model Name</string>
+    <string name="model_name_hint">e.g., FraudDetectionModel</string>
+    <string name="model_name_required">Model name is required</string>
+    <string name="model_version">Version</string>
+    <string name="model_version_hint">e.g., 1.0.0</string>
+    <string name="model_path">Model Path</string>
+    <string name="model_path_hint">e.g., fraud_model.tflite</string>
+    <string name="model_path_required">Model path is required</string>
+    <string name="model_path_help">Path to .tflite file in assets</string>
+    <string name="model_input_features">Input Features</string>
+    <string name="model_input_features_hint">amount,merchant,time,category</string>
+    <string name="model_input_features_required">Features are required</string>
+    <string name="model_input_features_help">Comma-separated feature names</string>
+    <string name="model_output_labels">Output Labels</string>
+    <string name="model_output_labels_hint">legitimate,fraud</string>
+    <string name="model_output_labels_required">Labels are required</string>
+    <string name="model_output_labels_help">Comma-separated class labels</string>
+
+    <!-- Model Upload -->
+    <string name="upload_title">Upload Model &amp; Data</string>
+    <string name="upload_method_local">Local Files</string>
+    <string name="upload_method_cloud">Cloud Storage</string>
+    <string name="upload_method_url">URL Import</string>
+    <string name="upload_file_url">File URL</string>
+    <string name="upload_file_url_hint">https://example.com/model.tflite</string>
+    <string name="upload_file_url_required">Please enter a valid URL</string>
+    <string name="upload_file_url_help">Enter a direct link to your model or dataset file</string>
+    <string name="upload_import_url">Import from URL</string>
+    <string name="upload_browse">Browse Files</string>
+    <string name="upload_connect_google">Connect Google Drive</string>
+    <string name="upload_connect_dropbox">Connect Dropbox</string>
+    <string name="upload_connect_onedrive">Connect OneDrive</string>
+
+    <!-- Drift Detection -->
+    <string name="drift_detected">Drift Detected</string>
+    <string name="drift_no_drift">No Drift</string>
+    <string name="drift_score">Drift Score</string>
+    <string name="drift_score_value">Drift Score: %1$.3f</string>
+    <string name="drift_type">Drift Type</string>
+    <string name="drift_threshold">Threshold</string>
+    <string name="drift_features">Drifted Features</string>
+
+    <!-- Drift Types -->
+    <string name="drift_type_concept">Concept Drift</string>
+    <string name="drift_type_covariate">Covariate Drift</string>
+    <string name="drift_type_prior">Prior Drift</string>
+    <string name="drift_type_sudden">Sudden Drift</string>
+    <string name="drift_type_incremental">Incremental Drift</string>
+    <string name="drift_type_none">No Drift</string>
+
+    <!-- Patches -->
+    <string name="patches_title">Patches</string>
+    <string name="patches_view">View Patches</string>
+    <string name="patches_apply">Apply</string>
+    <string name="patches_rollback">Rollback</string>
+    <string name="patches_applied">Patch applied successfully</string>
+    <string name="patches_rolled_back">Patch rolled back successfully</string>
+    <string name="patches_synthesized">Patch Synthesized!</string>
+    <string name="patches_type">Type</string>
+    <string name="patches_safety">Safety</string>
+    <string name="patches_status">Status</string>
+
+    <!-- Patch Types -->
+    <string name="patch_type_retraining">Retraining</string>
+    <string name="patch_type_resampling">Resampling</string>
+    <string name="patch_type_feature_engineering">Feature Engineering</string>
+    <string name="patch_type_ensemble">Ensemble</string>
+    <string name="patch_type_clipping">Feature Clipping</string>
+    <string name="patch_type_reweighting">Feature Reweighting</string>
+    <string name="patch_type_threshold">Threshold Tuning</string>
+    <string name="patch_type_normalization">Normalization Update</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_notifications_enable">Enable notifications</string>
+    <string name="settings_drift_alerts">Drift alerts</string>
+    <string name="settings_patch_alerts">Patch alerts</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_theme_auto">Auto (System)</string>
+    <string name="settings_security">Security</string>
+    <string name="settings_encryption">Database Encryption</string>
+    <string name="settings_encryption_desc">Encrypt all stored data (enabled by default)</string>
+    <string name="settings_backup">Automatic Backup</string>
+    <string name="settings_backup_enable">Enable automatic backups</string>
+    <string name="settings_backup_frequency">Backup Frequency</string>
+    <string name="settings_data">Data Management</string>
+    <string name="settings_export">Export Data</string>
+    <string name="settings_export_desc">Export models, patches, and drift history</string>
+
+    <!-- Export -->
+    <string name="export_title">Export Data</string>
+    <string name="export_selected">Export (%1$d)</string>
+    <string name="export_success">Export Successful!</string>
+    <string name="export_failed">Export Failed</string>
+    <string name="export_progress">Exporting Data</string>
+    <string name="export_open_folder">Open Folder</string>
+
+    <!-- Offline & Sync -->
+    <string name="offline_indicator">Working offline - Changes will sync when online</string>
+    <string name="offline_pending">%1$d pending</string>
+    <string name="sync_syncing">Syncing %1$d/%2$d…</string>
+    <string name="sync_success">Synced %1$d items</string>
+    <string name="sync_failed">Sync failed</string>
+    <string name="sync_retrying">Retrying automatically…</string>
+
+    <!-- Network Status -->
+    <string name="network_wifi">WiFi</string>
+    <string name="network_cellular">Cellular</string>
+    <string name="network_ethernet">Ethernet</string>
+    <string name="network_disconnected">Disconnected</string>
 
     <!-- Errors -->
-    <string name="error_loading_data">Error loading data</string>
+    <string name="error_generic">Something went wrong</string>
+    <string name="error_loading">Error loading data</string>
     <string name="error_network">Network error</string>
+    <string name="error_connection">Connection issue</string>
+    <string name="error_connection_desc">Please check your internet connection and try again</string>
+    <string name="error_server">Server Error</string>
+    <string name="error_server_desc">Our servers are having issues. We\'ll retry automatically</string>
+    <string name="error_storage">Storage Issue</string>
+    <string name="error_storage_desc">There\'s a problem saving data. Please free up some storage space</string>
+    <string name="error_technical_details">Technical Details</string>
+    <string name="error_clear_cache">Clear Cache</string>
+    <string name="error_contact_support">Contact Support</string>
+    <string name="error_open_settings">Open Settings</string>
+
+    <!-- Success Messages -->
+    <string name="success_uploaded">✅ Uploaded %1$d file(s) successfully!</string>
+    <string name="success_model_registered">✅ Model Registered Successfully!</string>
+    <string name="success_processing_complete">✅ Processing Complete!</string>
+    <string name="success_synced">✅ Synced successfully</string>
+
+    <!-- Info Messages -->
+    <string name="info_data_uploaded">✅ Data file uploaded!\n\n⚠️ Please upload a model file to begin drift detection.</string>
+    <string name="info_upload_encrypted">All uploads are encrypted and stored locally on your device</string>
+    <string name="info_model_ready">Your model is now active and ready to monitor!</string>
+
+    <!-- Analytics -->
+    <string name="analytics_total_drifts">Total Drift Events</string>
+    <string name="analytics_drift_rate">Drift Detection Rate</string>
+    <string name="analytics_avg_score">Average Drift Score</string>
+    <string name="analytics_health_score">Model Health Score</string>
+    <string name="analytics_patches_applied">Patches Applied</string>
+    <string name="analytics_success_rate">Success Rate</string>
+    <string name="analytics_trend">Trend</string>
+    <string name="analytics_forecast">7-Day Forecast</string>
+
+    <!-- Time Ranges -->
+    <string name="time_range_7days">Last 7 Days</string>
+    <string name="time_range_30days">Last 30 Days</string>
+    <string name="time_range_90days">Last 90 Days</string>
+    <string name="time_range_custom">Custom Range</string>
 
     <!-- Notifications -->
     <string name="notification_drift_title">Drift Detected</string>
     <string name="notification_drift_desc">Model %1$s has detected drift</string>
+    <string name="notification_drift_detailed">Model: %1$s (Score: %2$.3f)</string>
+    <string name="notification_channel_critical">Critical Drift Alerts</string>
+    <string name="notification_channel_warning">Drift Warnings</string>
+    <string name="notification_channel_patches">Patch Updates</string>
+    <string name="notification_channel_digest">Daily Digest</string>
+
+    <!-- Recommendations -->
+    <string name="recommendations_title">Recommendations</string>
+    <string name="recommendations_priority_high">High Priority</string>
+    <string name="recommendations_priority_medium">Medium Priority</string>
+    <string name="recommendations_priority_low">Low Priority</string>
+
+    <!-- Date/Time -->
+    <string name="date_today">Today</string>
+    <string name="date_yesterday">Yesterday</string>
+    <string name="date_last_updated">Last updated: %1$s</string>
+
+    <!-- Units -->
+    <string name="unit_models">models</string>
+    <string name="unit_drifts">drifts</string>
+    <string name="unit_patches">patches</string>
+    <string name="unit_days">days</string>
+    <string name="unit_hours">hours</string>
+    <string name="unit_minutes">minutes</string>
+
+    <!-- Plurals -->
+    <plurals name="models_count">
+        <item quantity="one">%d model</item>
+        <item quantity="other">%d models</item>
+    </plurals>
+    <plurals name="drifts_count">
+        <item quantity="one">%d drift event</item>
+        <item quantity="other">%d drift events</item>
+    </plurals>
+    <plurals name="patches_count">
+        <item quantity="one">%d patch</item>
+        <item quantity="other">%d patches</item>
+    </plurals>
+
 </resources>

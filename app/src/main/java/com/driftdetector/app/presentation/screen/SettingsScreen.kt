@@ -18,8 +18,8 @@ import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PrivacyTip
@@ -40,7 +40,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.driftdetector.app.presentation.viewmodel.ExportLocation
+import com.driftdetector.app.presentation.viewmodel.ModelExportInfo
 import com.driftdetector.app.presentation.viewmodel.SettingsViewModel
 import org.koin.androidx.compose.koinViewModel
 
@@ -50,6 +53,14 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    // Show export model selection dialog
+    if (uiState.showExportDialog) {
+        ModelExportDialog(
+            viewModel = viewModel,
+            onDismiss = { viewModel.closeExportDialog() }
+        )
+    }
+
     // Show export status dialog
     if (uiState.isExporting) {
         ExportProgressDialog()
@@ -58,8 +69,10 @@ fun SettingsScreen(
     if (uiState.exportSuccess) {
         ExportSuccessDialog(
             exportedFiles = uiState.lastExportedFiles,
+            exportPath = uiState.lastExportPath,
             onDismiss = { viewModel.clearExportStatus() },
-            onShare = { viewModel.shareLastExport() }
+            onShare = { viewModel.shareLastExport() },
+            onOpenFolder = { viewModel.openExportLocation() }
         )
     }
 
@@ -253,7 +266,7 @@ fun SettingsScreen(
                     icon = Icons.Default.FileDownload,
                     title = "Export Data",
                     subtitle = "Export drift reports and patch history",
-                    onClick = { viewModel.exportData() }
+                    onClick = { viewModel.showExportDialog() }
                 )
             }
         }
@@ -323,7 +336,10 @@ fun SettingsSection(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp
         )
     ) {
         Column(
@@ -333,6 +349,7 @@ fun SettingsSection(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
             content()
@@ -362,9 +379,9 @@ fun ColumnScope.SwitchSettingItem(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = null,
+                contentDescription = "$title setting",
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(26.dp)
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column {
@@ -407,9 +424,9 @@ fun ColumnScope.SliderSettingItem(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = null,
+                contentDescription = "$title setting",
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(26.dp)
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -452,9 +469,9 @@ fun ColumnScope.ClickableSettingItem(
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = null,
+            contentDescription = "$title setting",
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(26.dp)
         )
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -489,9 +506,9 @@ fun ColumnScope.ThemeSettingItem(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = Icons.Default.Palette,
-                contentDescription = null,
+                contentDescription = "Theme setting",
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(26.dp)
             )
             Spacer(modifier = Modifier.width(16.dp))
             Text(
@@ -518,7 +535,7 @@ fun ColumnScope.ThemeSettingItem(
                                 ThemeMode.DARK -> Icons.Default.DarkMode
                                 ThemeMode.AUTO -> Icons.Default.Brightness4
                             },
-                            contentDescription = null
+                            contentDescription = "${mode.displayName} theme"
                         )
                     }
                 )
@@ -531,6 +548,193 @@ enum class ThemeMode(val displayName: String) {
     LIGHT("Light"),
     DARK("Dark"),
     AUTO("Auto")
+}
+
+@Composable
+fun ModelExportDialog(
+    viewModel: SettingsViewModel,
+    onDismiss: () -> Unit
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "Export Models",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(400.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Text(
+                        "Select models to export:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                // Model list
+                items(uiState.availableModels.size) { index ->
+                    val model = uiState.availableModels[index]
+                    ModelExportItem(
+                        model = model,
+                        isSelected = uiState.selectedModelIds.contains(model.modelId),
+                        onToggle = { viewModel.toggleModelSelection(model.modelId) }
+                    )
+                }
+
+                item {
+                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    Text(
+                        "Download Location:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                // Location selection
+                item {
+                    ExportLocation.values().forEach { location ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.selectDownloadLocation(location) }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = uiState.downloadLocation == location,
+                                onClick = { viewModel.selectDownloadLocation(location) }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = location.displayName,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                if (location == ExportLocation.DOWNLOADS) {
+                                    Text(
+                                        text = "/storage/emulated/0/Download",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { viewModel.exportSelectedModels() },
+                enabled = uiState.selectedModelIds.isNotEmpty()
+            ) {
+                Icon(
+                    Icons.Default.Download,
+                    contentDescription = "Export models",
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Export (${uiState.selectedModelIds.size})")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun ModelExportItem(
+    model: ModelExportInfo,
+    isSelected: Boolean,
+    onToggle: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected)
+                MaterialTheme.colorScheme.primaryContainer
+            else
+                MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = isSelected,
+                onCheckedChange = { onToggle() }
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = model.modelName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "v${model.version}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (model.patchedCount > 0) {
+                        ExportBadge(
+                            "✅ ${model.patchedCount} Patched",
+                            MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    if (model.ongoingCount > 0) {
+                        ExportBadge(
+                            "⏳ ${model.ongoingCount} Ongoing",
+                            MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                    if (model.driftCount > 0) {
+                        ExportBadge(
+                            "📊 ${model.driftCount} Drifts",
+                            MaterialTheme.colorScheme.tertiary
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ExportBadge(text: String, color: androidx.compose.ui.graphics.Color) {
+    Surface(
+        color = color.copy(alpha = 0.2f),
+        shape = MaterialTheme.shapes.small
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = color
+        )
+    }
 }
 
 @Composable
@@ -560,15 +764,17 @@ fun ExportProgressDialog() {
 @Composable
 fun ExportSuccessDialog(
     exportedFiles: List<String>,
+    exportPath: String,
     onDismiss: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onOpenFolder: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
             Icon(
                 imageVector = Icons.Default.CheckCircle,
-                contentDescription = null,
+                contentDescription = "Export successful",
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(48.dp)
             )
@@ -590,24 +796,44 @@ fun ExportSuccessDialog(
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "Files are saved in app storage and can be shared.",
+                    "Files are saved in $exportPath",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Spacer(modifier = Modifier.height(12.dp))
+                // Action buttons row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onOpenFolder,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            Icons.Default.FileDownload,
+                            contentDescription = "Open folder",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Open Folder", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Button(
+                        onClick = onShare,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = "Share exported files",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Share", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
             }
         },
         confirmButton = {
-            Button(onClick = onShare) {
-                Icon(
-                    imageVector = Icons.Default.Share,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Share")
-            }
-        },
-        dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Close")
             }
@@ -625,7 +851,7 @@ fun ExportErrorDialog(
         icon = {
             Icon(
                 imageVector = Icons.Default.Error,
-                contentDescription = null,
+                contentDescription = "Export error",
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(48.dp)
             )

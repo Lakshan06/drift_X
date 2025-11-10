@@ -6,6 +6,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.driftdetector.app.core.cloud.CloudProvider
 import com.driftdetector.app.core.cloud.CloudStorageManager
+import com.driftdetector.app.core.error.ErrorHandler
+import com.driftdetector.app.core.error.RetryPolicies
+import com.driftdetector.app.core.error.retryWithExponentialBackoff
 import com.driftdetector.app.core.upload.FileUploadProcessor
 import com.driftdetector.app.core.upload.ProcessingResult
 import com.driftdetector.app.domain.model.DriftResult
@@ -53,7 +56,8 @@ data class ModelUploadState(
 class ModelUploadViewModel(
     private val fileUploadProcessor: FileUploadProcessor,
     private val context: Context,
-    private val cloudStorageManager: CloudStorageManager
+    private val cloudStorageManager: CloudStorageManager,
+    private val errorHandler: ErrorHandler
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ModelUploadState())
@@ -178,6 +182,7 @@ class ModelUploadViewModel(
                     error = "Failed to upload files: ${e.message}"
                 )
                 _uploadProgress.value = 0f
+                errorHandler.handleError(e)
             }
         }
     }
@@ -209,45 +214,48 @@ class ModelUploadViewModel(
                 }
 
                 // Process model and data together
-                val result = fileUploadProcessor.processModelAndData(
-                    modelUri = model.uri,
-                    modelFileName = model.name,
-                    dataUri = data.uri,
-                    dataFileName = data.name
-                )
+                val result = retryWithExponentialBackoff(RetryPolicies.NETWORK) {
+                    val processingResult = fileUploadProcessor.processModelAndData(
+                        modelUri = model.uri,
+                        modelFileName = model.name,
+                        dataUri = data.uri,
+                        dataFileName = data.name
+                    )
+                    processingResult.getOrThrow()
+                }
 
                 _uploadProgress.value = 0f
 
-                if (result.isSuccess) {
-                    val processingResult = result.getOrThrow()
+                result.fold(
+                    onSuccess = { processingResult ->
+                        // Update state with results
+                        _uiState.value = _uiState.value.copy(
+                            isProcessing = false,
+                            processedModel = processingResult.model,
+                            detectedDrift = processingResult.driftResult,
+                            synthesizedPatch = processingResult.patch,
+                            successMessage = buildSuccessMessage(processingResult),
+                            uploadedFiles = _uiState.value.uploadedFiles.map {
+                                if (it.id == model.id || it.id == data.id) {
+                                    it.copy(
+                                        processed = true,
+                                        processingStatus = "✅ Processed successfully"
+                                    )
+                                } else it
+                            }
+                        )
 
-                    // Update state with results
-                    _uiState.value = _uiState.value.copy(
-                        isProcessing = false,
-                        processedModel = processingResult.model,
-                        detectedDrift = processingResult.driftResult,
-                        synthesizedPatch = processingResult.patch,
-                        successMessage = buildSuccessMessage(processingResult),
-                        uploadedFiles = _uiState.value.uploadedFiles.map {
-                            if (it.id == model.id || it.id == data.id) {
-                                it.copy(
-                                    processed = true,
-                                    processingStatus = "✅ Processed successfully"
-                                )
-                            } else it
-                        }
-                    )
-
-                    Timber.i("✅ Files processed successfully!")
-
-                } else {
-                    val error = result.exceptionOrNull()
-                    Timber.e(error, "❌ Failed to process files")
-                    _uiState.value = _uiState.value.copy(
-                        isProcessing = false,
-                        error = "Processing failed: ${error?.message}"
-                    )
-                }
+                        Timber.i("✅ Files processed successfully!")
+                    },
+                    onFailure = { error ->
+                        Timber.e(error, "❌ Failed to process files")
+                        _uiState.value = _uiState.value.copy(
+                            isProcessing = false,
+                            error = "Processing failed: ${error.message}"
+                        )
+                        errorHandler.handleError(error)
+                    }
+                )
 
             } catch (e: Exception) {
                 Timber.e(e, "❌ Failed to process files")
@@ -256,6 +264,7 @@ class ModelUploadViewModel(
                     error = "Processing failed: ${e.message}"
                 )
                 _uploadProgress.value = 0f
+                errorHandler.handleError(e)
             }
         }
     }
@@ -285,41 +294,44 @@ class ModelUploadViewModel(
                 }
 
                 // Process and register model
-                val result = fileUploadProcessor.processModelFile(
-                    uri = model.uri,
-                    fileName = model.name
-                )
+                val result = retryWithExponentialBackoff(RetryPolicies.NETWORK) {
+                    val modelResult = fileUploadProcessor.processModelFile(
+                        uri = model.uri,
+                        fileName = model.name
+                    )
+                    modelResult.getOrThrow()
+                }
 
                 _uploadProgress.value = 0f
 
-                if (result.isSuccess) {
-                    val registeredModel = result.getOrThrow()
+                result.fold(
+                    onSuccess = { registeredModel ->
+                        // Update state with registered model
+                        _uiState.value = _uiState.value.copy(
+                            isProcessing = false,
+                            processedModel = registeredModel,
+                            successMessage = buildModelOnlySuccessMessage(registeredModel),
+                            uploadedFiles = _uiState.value.uploadedFiles.map {
+                                if (it.id == model.id) {
+                                    it.copy(
+                                        processed = true,
+                                        processingStatus = "✅ Model registered & ready"
+                                    )
+                                } else it
+                            }
+                        )
 
-                    // Update state with registered model
-                    _uiState.value = _uiState.value.copy(
-                        isProcessing = false,
-                        processedModel = registeredModel,
-                        successMessage = buildModelOnlySuccessMessage(registeredModel),
-                        uploadedFiles = _uiState.value.uploadedFiles.map {
-                            if (it.id == model.id) {
-                                it.copy(
-                                    processed = true,
-                                    processingStatus = "✅ Model registered & ready"
-                                )
-                            } else it
-                        }
-                    )
-
-                    Timber.i("✅ Model registered successfully: ${registeredModel.name}")
-
-                } else {
-                    val error = result.exceptionOrNull()
-                    Timber.e(error, "❌ Failed to process model")
-                    _uiState.value = _uiState.value.copy(
-                        isProcessing = false,
-                        error = "Failed to register model: ${error?.message}"
-                    )
-                }
+                        Timber.i("✅ Model registered successfully: ${registeredModel.name}")
+                    },
+                    onFailure = { error ->
+                        Timber.e(error, "❌ Failed to process model")
+                        _uiState.value = _uiState.value.copy(
+                            isProcessing = false,
+                            error = "Failed to register model: ${error.message}"
+                        )
+                        errorHandler.handleError(error)
+                    }
+                )
 
             } catch (e: Exception) {
                 Timber.e(e, "❌ Failed to process model")
@@ -328,6 +340,7 @@ class ModelUploadViewModel(
                     error = "Failed to register model: ${e.message}"
                 )
                 _uploadProgress.value = 0f
+                errorHandler.handleError(e)
             }
         }
     }
@@ -408,37 +421,47 @@ class ModelUploadViewModel(
                 }
 
                 // Attempt connection
-                val authResult = cloudStorageManager.connectProvider(cloudProvider)
+                val authResult = retryWithExponentialBackoff(RetryPolicies.NETWORK) {
+                    cloudStorageManager.connectProvider(cloudProvider)
+                }.getOrThrow()
 
                 if (authResult.success) {
                     Timber.i("✅ Connected to $provider")
 
                     // List available files
-                    val filesResult = cloudStorageManager.listFiles(
-                        provider = cloudProvider,
-                        accessToken = authResult.accessToken ?: "",
-                        fileTypes = listOf(".tflite", ".onnx", ".csv", ".json", ".parquet")
-                    )
-
-                    if (filesResult.isSuccess) {
-                        val cloudFiles = filesResult.getOrDefault(emptyList())
-                        Timber.d(" Found ${cloudFiles.size} files in $provider")
-
-                        _uiState.value = _uiState.value.copy(
-                            successMessage = "✅ Connected to $provider! Found ${cloudFiles.size} compatible files.\n\nCloud file selection UI coming soon - for now, files are listed in logs.",
-                            isUploading = false
+                    val filesResult = retryWithExponentialBackoff(RetryPolicies.NETWORK) {
+                        val result = cloudStorageManager.listFiles(
+                            provider = cloudProvider,
+                            accessToken = authResult.accessToken ?: "",
+                            fileTypes = listOf(".tflite", ".onnx", ".csv", ".json", ".parquet")
                         )
-                    } else {
-                        _uiState.value = _uiState.value.copy(
-                            error = "Connected but failed to list files: ${filesResult.exceptionOrNull()?.message}",
-                            isUploading = false
-                        )
+                        result.getOrThrow()
                     }
+
+                    filesResult.fold(
+                        onSuccess = { cloudFiles ->
+                            Timber.d(" Found ${cloudFiles.size} files in $provider")
+
+                            _uiState.value = _uiState.value.copy(
+                                successMessage = "✅ Connected to $provider! Found ${cloudFiles.size} compatible files.\n\nCloud file selection UI coming soon - for now, files are listed in logs.",
+                                isUploading = false
+                            )
+                        },
+                        onFailure = { error ->
+                            _uiState.value = _uiState.value.copy(
+                                error = "Connected but failed to list files: ${error.message}",
+                                isUploading = false
+                            )
+                            errorHandler.handleError(error)
+                        }
+                    )
                 } else {
+                    val errorMsg = authResult.error ?: "Unknown error"
                     _uiState.value = _uiState.value.copy(
-                        error = "Failed to connect: ${authResult.error}",
+                        error = "Failed to connect: $errorMsg",
                         isUploading = false
                     )
+                    errorHandler.handleError(Exception(errorMsg))
                 }
 
             } catch (e: Exception) {
@@ -447,6 +470,7 @@ class ModelUploadViewModel(
                     error = "Failed to connect to $provider: ${e.message}",
                     isUploading = false
                 )
+                errorHandler.handleError(e)
             }
         }
     }
@@ -604,6 +628,7 @@ class ModelUploadViewModel(
                                     error = "Download failed (code: $reason). Check your internet connection and try again."
                                 )
                                 Timber.e("❌ Download failed with reason: $reason")
+                                errorHandler.handleError(Exception("Download failed with reason: $reason"))
                             }
 
                             android.app.DownloadManager.STATUS_PAUSED -> {
@@ -629,6 +654,7 @@ class ModelUploadViewModel(
                     error = "Failed to import from URL: ${e.message}"
                 )
                 _uploadProgress.value = 0f
+                errorHandler.handleError(e)
             }
         }
     }

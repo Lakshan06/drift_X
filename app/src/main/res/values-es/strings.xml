@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App Name -->
+    <string name="app_name">DriftGuardAI</string>
+
+    <!-- Common Actions -->
+    <string name="action_ok">Aceptar</string>
+    <string name="action_cancel">Cancelar</string>
+    <string name="action_close">Cerrar</string>
+    <string name="action_dismiss">Descartar</string>
+    <string name="action_retry">Reintentar</string>
+    <string name="action_continue">Continuar</string>
+    <string name="action_back">Atrás</string>
+    <string name="action_skip">Omitir</string>
+    <string name="action_next">Siguiente</string>
+    <string name="action_save">Guardar</string>
+    <string name="action_delete">Eliminar</string>
+    <string name="action_edit">Editar</string>
+    <string name="action_share">Compartir</string>
+    <string name="action_export">Exportar</string>
+    <string name="action_import">Importar</string>
+    <string name="action_search">Buscar</string>
+    <string name="action_filter">Filtrar</string>
+    <string name="action_refresh">Actualizar</string>
+    <string name="action_apply">Aplicar</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Panel de Monitoreo de Deriva</string>
+    <string name="dashboard_tab_overview">Resumen</string>
+    <string name="dashboard_tab_analytics">Análisis</string>
+    <string name="dashboard_tab_alerts">Alertas</string>
+    <string name="dashboard_loading">Cargando panel…</string>
+    <string name="dashboard_no_models">Sin modelos activos</string>
+    <string name="dashboard_register_model">Registra un modelo para comenzar el monitoreo</string>
+    <string name="dashboard_view">Ver Panel</string>
+
+    <!-- Models -->
+    <string name="models_title">Modelos</string>
+    <string name="models_all">Todos los Modelos (%1$d)</string>
+    <string name="models_active">Activos (%1$d)</string>
+    <string name="models_drifted">Con Deriva (%1$d)</string>
+    <string name="models_search">Buscar modelos…</string>
+    <string name="models_upload">Subir Modelo y Datos</string>
+    <string name="models_register">Registrar Modelo Existente</string>
+    <string name="models_register_new">Registrar Nuevo Modelo</string>
+    <string name="models_deactivate">Desactivar</string>
+    <string name="models_view_details">Ver Detalles</string>
+
+    <!-- Model Registration -->
+    <string name="model_name">Nombre del Modelo</string>
+    <string name="model_name_hint">ej., ModeloDetecciónFraude</string>
+    <string name="model_name_required">El nombre del modelo es requerido</string>
+    <string name="model_version">Versión</string>
+    <string name="model_version_hint">ej., 1.0.0</string>
+    <string name="model_path">Ruta del Modelo</string>
+    <string name="model_path_hint">ej., modelo_fraude.tflite</string>
+    <string name="model_path_required">La ruta del modelo es requerida</string>
+    <string name="model_path_help">Ruta al archivo .tflite en assets</string>
+    <string name="model_input_features">Características de Entrada</string>
+    <string name="model_input_features_hint">monto,comerciante,tiempo,categoría</string>
+    <string name="model_input_features_required">Las características son requeridas</string>
+    <string name="model_input_features_help">Nombres de características separados por comas</string>
+    <string name="model_output_labels">Etiquetas de Salida</string>
+    <string name="model_output_labels_hint">legítimo,fraude</string>
+    <string name="model_output_labels_required">Las etiquetas son requeridas</string>
+    <string name="model_output_labels_help">Etiquetas de clase separadas por comas</string>
+
+    <!-- Model Upload -->
+    <string name="upload_title">Subir Modelo y Datos</string>
+    <string name="upload_method_local">Archivos Locales</string>
+    <string name="upload_method_cloud">Almacenamiento en la Nube</string>
+    <string name="upload_method_url">Importar desde URL</string>
+    <string name="upload_file_url">URL del Archivo</string>
+    <string name="upload_file_url_hint">https://ejemplo.com/modelo.tflite</string>
+    <string name="upload_file_url_required">Por favor ingresa una URL válida</string>
+    <string name="upload_file_url_help">Ingresa un enlace directo a tu modelo o archivo de datos</string>
+    <string name="upload_import_url">Importar desde URL</string>
+    <string name="upload_browse">Explorar Archivos</string>
+    <string name="upload_connect_google">Conectar Google Drive</string>
+    <string name="upload_connect_dropbox">Conectar Dropbox</string>
+    <string name="upload_connect_onedrive">Conectar OneDrive</string>
+
+    <!-- Drift Detection -->
+    <string name="drift_detected">Deriva Detectada</string>
+    <string name="drift_no_drift">Sin Deriva</string>
+    <string name="drift_score">Puntuación de Deriva</string>
+    <string name="drift_score_value">Puntuación de Deriva: %1$.3f</string>
+    <string name="drift_type">Tipo de Deriva</string>
+    <string name="drift_threshold">Umbral</string>
+    <string name="drift_features">Características con Deriva</string>
+
+    <!-- Drift Types -->
+    <string name="drift_type_concept">Deriva Conceptual</string>
+    <string name="drift_type_covariate">Deriva Covariante</string>
+    <string name="drift_type_prior">Deriva Previa</string>
+    <string name="drift_type_sudden">Deriva Repentina</string>
+    <string name="drift_type_incremental">Deriva Incremental</string>
+    <string name="drift_type_none">Sin Deriva</string>
+
+    <!-- Patches -->
+    <string name="patches_title">Parches</string>
+    <string name="patches_view">Ver Parches</string>
+    <string name="patches_apply">Aplicar</string>
+    <string name="patches_rollback">Revertir</string>
+    <string name="patches_applied">Parche aplicado exitosamente</string>
+    <string name="patches_rolled_back">Parche revertido exitosamente</string>
+    <string name="patches_synthesized">¡Parche Sintetizado!</string>
+    <string name="patches_type">Tipo</string>
+    <string name="patches_safety">Seguridad</string>
+    <string name="patches_status">Estado</string>
+
+    <!-- Patch Types -->
+    <string name="patch_type_retraining">Reentrenamiento</string>
+    <string name="patch_type_resampling">Remuestreo</string>
+    <string name="patch_type_feature_engineering">Ingeniería de Características</string>
+    <string name="patch_type_ensemble">Conjunto</string>
+    <string name="patch_type_clipping">Recorte de Características</string>
+    <string name="patch_type_reweighting">Reponderación de Características</string>
+    <string name="patch_type_threshold">Ajuste de Umbral</string>
+    <string name="patch_type_normalization">Actualización de Normalización</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Configuración</string>
+    <string name="settings_notifications">Notificaciones</string>
+    <string name="settings_notifications_enable">Habilitar notificaciones</string>
+    <string name="settings_drift_alerts">Alertas de deriva</string>
+    <string name="settings_patch_alerts">Alertas de parches</string>
+    <string name="settings_appearance">Apariencia</string>
+    <string name="settings_theme">Tema</string>
+    <string name="settings_theme_light">Claro</string>
+    <string name="settings_theme_dark">Oscuro</string>
+    <string name="settings_theme_auto">Automático (Sistema)</string>
+    <string name="settings_security">Seguridad</string>
+    <string name="settings_encryption">Cifrado de Base de Datos</string>
+    <string name="settings_encryption_desc">Cifrar todos los datos almacenados (habilitado por defecto)</string>
+    <string name="settings_backup">Copia de Seguridad Automática</string>
+    <string name="settings_backup_enable">Habilitar copias de seguridad automáticas</string>
+    <string name="settings_backup_frequency">Frecuencia de Copia de Seguridad</string>
+    <string name="settings_data">Gestión de Datos</string>
+    <string name="settings_export">Exportar Datos</string>
+    <string name="settings_export_desc">Exportar modelos, parches e historial de deriva</string>
+
+    <!-- Export -->
+    <string name="export_title">Exportar Datos</string>
+    <string name="export_selected">Exportar (%1$d)</string>
+    <string name="export_success">¡Exportación Exitosa!</string>
+    <string name="export_failed">Exportación Fallida</string>
+    <string name="export_progress">Exportando Datos</string>
+    <string name="export_open_folder">Abrir Carpeta</string>
+
+    <!-- Offline & Sync -->
+    <string name="offline_indicator">Trabajando sin conexión - Los cambios se sincronizarán cuando haya conexión</string>
+    <string name="offline_pending">%1$d pendientes</string>
+    <string name="sync_syncing">Sincronizando %1$d/%2$d…</string>
+    <string name="sync_success">%1$d elementos sincronizados</string>
+    <string name="sync_failed">Sincronización fallida</string>
+    <string name="sync_retrying">Reintentando automáticamente…</string>
+
+    <!-- Network Status -->
+    <string name="network_wifi">WiFi</string>
+    <string name="network_cellular">Celular</string>
+    <string name="network_ethernet">Ethernet</string>
+    <string name="network_disconnected">Desconectado</string>
+
+    <!-- Errors -->
+    <string name="error_generic">Algo salió mal</string>
+    <string name="error_loading">Error al cargar datos</string>
+    <string name="error_network">Error de red</string>
+    <string name="error_connection">Problema de conexión</string>
+    <string name="error_connection_desc">Por favor verifica tu conexión a internet e inténtalo de nuevo</string>
+    <string name="error_server">Error del Servidor</string>
+    <string name="error_server_desc">Nuestros servidores están teniendo problemas. Reintentaremos automáticamente</string>
+    <string name="error_storage">Problema de Almacenamiento</string>
+    <string name="error_storage_desc">Hay un problema al guardar datos. Por favor libera espacio de almacenamiento</string>
+    <string name="error_technical_details">Detalles Técnicos</string>
+    <string name="error_clear_cache">Limpiar Caché</string>
+    <string name="error_contact_support">Contactar Soporte</string>
+    <string name="error_open_settings">Abrir Configuración</string>
+
+    <!-- Success Messages -->
+    <string name="success_uploaded">✅ ¡%1$d archivo(s) subido(s) exitosamente!</string>
+    <string name="success_model_registered">✅ ¡Modelo Registrado Exitosamente!</string>
+    <string name="success_processing_complete">✅ ¡Procesamiento Completo!</string>
+    <string name="success_synced">✅ Sincronizado exitosamente</string>
+
+    <!-- Info Messages -->
+    <string name="info_data_uploaded">✅ ¡Archivo de datos subido!\n\n⚠️ Por favor sube un archivo de modelo para comenzar la detección de deriva.</string>
+    <string name="info_upload_encrypted">Todas las subidas están cifradas y almacenadas localmente en tu dispositivo</string>
+    <string name="info_model_ready">¡Tu modelo ahora está activo y listo para monitorear!</string>
+
+    <!-- Analytics -->
+    <string name="analytics_total_drifts">Total de Eventos de Deriva</string>
+    <string name="analytics_drift_rate">Tasa de Detección de Deriva</string>
+    <string name="analytics_avg_score">Puntuación Promedio de Deriva</string>
+    <string name="analytics_health_score">Puntuación de Salud del Modelo</string>
+    <string name="analytics_patches_applied">Parches Aplicados</string>
+    <string name="analytics_success_rate">Tasa de Éxito</string>
+    <string name="analytics_trend">Tendencia</string>
+    <string name="analytics_forecast">Pronóstico de 7 Días</string>
+
+    <!-- Time Ranges -->
+    <string name="time_range_7days">Últimos 7 Días</string>
+    <string name="time_range_30days">Últimos 30 Días</string>
+    <string name="time_range_90days">Últimos 90 Días</string>
+    <string name="time_range_custom">Rango Personalizado</string>
+
+    <!-- Notifications -->
+    <string name="notification_drift_title">Deriva Detectada</string>
+    <string name="notification_drift_desc">El modelo %1$s ha detectado deriva</string>
+    <string name="notification_drift_detailed">Modelo: %1$s (Puntuación: %2$.3f)</string>
+    <string name="notification_channel_critical">Alertas Críticas de Deriva</string>
+    <string name="notification_channel_warning">Advertencias de Deriva</string>
+    <string name="notification_channel_patches">Actualizaciones de Parches</string>
+    <string name="notification_channel_digest">Resumen Diario</string>
+
+    <!-- Recommendations -->
+    <string name="recommendations_title">Recomendaciones</string>
+    <string name="recommendations_priority_high">Alta Prioridad</string>
+    <string name="recommendations_priority_medium">Prioridad Media</string>
+    <string name="recommendations_priority_low">Baja Prioridad</string>
+
+    <!-- Date/Time -->
+    <string name="date_today">Hoy</string>
+    <string name="date_yesterday">Ayer</string>
+    <string name="date_last_updated">Última actualización: %1$s</string>
+
+    <!-- Units -->
+    <string name="unit_models">modelos</string>
+    <string name="unit_drifts">derivas</string>
+    <string name="unit_patches">parches</string>
+    <string name="unit_days">días</string>
+    <string name="unit_hours">horas</string>
+    <string name="unit_minutes">minutos</string>
+
+    <!-- Plurals -->
+    <plurals name="models_count">
+        <item quantity="one">%d modelo</item>
+        <item quantity="other">%d modelos</item>
+    </plurals>
+    <plurals name="drifts_count">
+        <item quantity="one">%d evento de deriva</item>
+        <item quantity="other">%d eventos de deriva</item>
+    </plurals>
+    <plurals name="patches_count">
+        <item quantity="one">%d parche</item>
+        <item quantity="other">%d parches</item>
+    </plurals>
+
+</resources>

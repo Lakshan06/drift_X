@@ -6,6 +6,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.driftdetector.app.core.security.EncryptedData
+import com.driftdetector.app.core.security.EncryptionManager
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -22,17 +24,19 @@ private val Context.authDataStore: DataStore<Preferences> by preferencesDataStor
  */
 class AuthManager(
     private val context: Context,
-    private val gson: Gson = Gson()
+    private val gson: Gson = Gson(),
+    private val encryptionManager: EncryptionManager
 ) {
 
     private val dataStore = context.authDataStore
 
     companion object {
-        private val KEY_ACCESS_TOKEN = stringPreferencesKey("access_token")
-        private val KEY_REFRESH_TOKEN = stringPreferencesKey("refresh_token")
-        private val KEY_USER_ID = stringPreferencesKey("user_id")
-        private val KEY_USER_EMAIL = stringPreferencesKey("user_email")
-        private val KEY_USER_ROLE = stringPreferencesKey("user_role")
+        private val KEY_ACCESS_TOKEN = stringPreferencesKey("encrypted_access_token")
+        private val KEY_REFRESH_TOKEN = stringPreferencesKey("encrypted_refresh_token")
+        private val KEY_USER_ID = stringPreferencesKey("encrypted_user_id")
+        private val KEY_USER_EMAIL = stringPreferencesKey("encrypted_user_email")
+        private val KEY_USER_ROLE = stringPreferencesKey("encrypted_user_role")
+        private val TOKEN_EXPIRY_KEY = stringPreferencesKey("token_expiry")
     }
 
     /**
@@ -48,7 +52,15 @@ class AuthManager(
      */
     suspend fun getAccessToken(): String? {
         return dataStore.data.map { preferences ->
-            preferences[KEY_ACCESS_TOKEN]
+            try {
+                preferences[KEY_ACCESS_TOKEN]?.let { encrypted ->
+                    val encryptedData = EncryptedData.fromBase64(encrypted)
+                    encryptionManager.decryptString(encryptedData)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to decrypt access token")
+                null
+            }
         }.first()
     }
 
@@ -57,7 +69,15 @@ class AuthManager(
      */
     suspend fun getRefreshToken(): String? {
         return dataStore.data.map { preferences ->
-            preferences[KEY_REFRESH_TOKEN]
+            try {
+                preferences[KEY_REFRESH_TOKEN]?.let { encrypted ->
+                    val encryptedData = EncryptedData.fromBase64(encrypted)
+                    encryptionManager.decryptString(encryptedData)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to decrypt refresh token")
+                null
+            }
         }.first()
     }
 
@@ -66,19 +86,36 @@ class AuthManager(
      */
     suspend fun getCurrentUser(): UserSession? {
         return dataStore.data.map { preferences ->
-            val userId = preferences[KEY_USER_ID]
-            val email = preferences[KEY_USER_EMAIL]
-            val role = preferences[KEY_USER_ROLE]
-            val token = preferences[KEY_ACCESS_TOKEN]
+            try {
+                val userId = preferences[KEY_USER_ID]?.let { encrypted ->
+                    val encryptedData = EncryptedData.fromBase64(encrypted)
+                    encryptionManager.decryptString(encryptedData)
+                }
+                val email = preferences[KEY_USER_EMAIL]?.let { encrypted ->
+                    val encryptedData = EncryptedData.fromBase64(encrypted)
+                    encryptionManager.decryptString(encryptedData)
+                }
+                val role = preferences[KEY_USER_ROLE]?.let { encrypted ->
+                    val encryptedData = EncryptedData.fromBase64(encrypted)
+                    encryptionManager.decryptString(encryptedData)
+                }
+                val token = preferences[KEY_ACCESS_TOKEN]?.let { encrypted ->
+                    val encryptedData = EncryptedData.fromBase64(encrypted)
+                    encryptionManager.decryptString(encryptedData)
+                }
 
-            if (userId != null && email != null && token != null) {
-                UserSession(
-                    userId = userId,
-                    email = email,
-                    role = role ?: "user",
-                    token = token
-                )
-            } else null
+                if (userId != null && email != null && token != null) {
+                    UserSession(
+                        userId = userId,
+                        email = email,
+                        role = role ?: "user",
+                        token = token
+                    )
+                } else null
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to get current user")
+                null
+            }
         }.first()
     }
 
@@ -86,14 +123,28 @@ class AuthManager(
      * Flow of authentication state
      */
     val authStateFlow: Flow<AuthState> = dataStore.data.map { preferences ->
-        val token = preferences[KEY_ACCESS_TOKEN]
+        try {
+            val token = preferences[KEY_ACCESS_TOKEN]?.let { encrypted ->
+                val encryptedData = EncryptedData.fromBase64(encrypted)
+                encryptionManager.decryptString(encryptedData)
+            }
 
-        if (token != null && !isTokenExpired(token)) {
-            AuthState.Authenticated(
-                userId = preferences[KEY_USER_ID] ?: "",
-                email = preferences[KEY_USER_EMAIL] ?: ""
-            )
-        } else {
+            if (token != null && !isTokenExpired(token)) {
+                AuthState.Authenticated(
+                    userId = preferences[KEY_USER_ID]?.let { encrypted ->
+                        val encryptedData = EncryptedData.fromBase64(encrypted)
+                        encryptionManager.decryptString(encryptedData)
+                    } ?: "",
+                    email = preferences[KEY_USER_EMAIL]?.let { encrypted ->
+                        val encryptedData = EncryptedData.fromBase64(encrypted)
+                        encryptionManager.decryptString(encryptedData)
+                    } ?: ""
+                )
+            } else {
+                AuthState.Unauthenticated
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to get auth state")
             AuthState.Unauthenticated
         }
     }
@@ -158,9 +209,7 @@ class AuthManager(
             // Mock token refresh
             val newToken = generateMockJWT(getCurrentUser()?.email ?: "user@example.com")
 
-            dataStore.edit { preferences ->
-                preferences[KEY_ACCESS_TOKEN] = newToken
-            }
+            saveAccessToken(newToken)
 
             Timber.i("✅ Token refreshed")
             Result.success(newToken)
@@ -175,15 +224,40 @@ class AuthManager(
      * Save authentication session
      */
     private suspend fun saveSession(session: UserSession, refreshToken: String? = null) {
-        dataStore.edit { preferences ->
-            preferences[KEY_ACCESS_TOKEN] = session.token
-            preferences[KEY_USER_ID] = session.userId
-            preferences[KEY_USER_EMAIL] = session.email
-            preferences[KEY_USER_ROLE] = session.role
+        try {
+            val encryptedToken = encryptionManager.encryptString(session.token)
+            val encryptedUserId = encryptionManager.encryptString(session.userId)
+            val encryptedEmail = encryptionManager.encryptString(session.email)
+            val encryptedRole = encryptionManager.encryptString(session.role)
 
-            refreshToken?.let {
-                preferences[KEY_REFRESH_TOKEN] = it
+            dataStore.edit { preferences ->
+                preferences[KEY_ACCESS_TOKEN] = encryptedToken.toBase64()
+                preferences[KEY_USER_ID] = encryptedUserId.toBase64()
+                preferences[KEY_USER_EMAIL] = encryptedEmail.toBase64()
+                preferences[KEY_USER_ROLE] = encryptedRole.toBase64()
+
+                refreshToken?.let {
+                    val encryptedRefreshToken = encryptionManager.encryptString(it)
+                    preferences[KEY_REFRESH_TOKEN] = encryptedRefreshToken.toBase64()
+                }
             }
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to save session")
+        }
+    }
+
+    /**
+     * Save access token (encrypted)
+     */
+    suspend fun saveAccessToken(token: String) {
+        try {
+            val encryptedToken = encryptionManager.encryptString(token)
+            dataStore.edit { preferences ->
+                preferences[KEY_ACCESS_TOKEN] = encryptedToken.toBase64()
+            }
+            Timber.d("🔒 Access token saved (encrypted)")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to save access token")
         }
     }
 

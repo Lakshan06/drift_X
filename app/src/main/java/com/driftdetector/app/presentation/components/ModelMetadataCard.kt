@@ -59,7 +59,7 @@ fun ModelMetadataCard(
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = getModelIcon(metadata),
-                                contentDescription = null,
+                                contentDescription = "${metadata.getModelType()} model icon",
                                 tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(28.dp)
                             )
@@ -112,7 +112,7 @@ fun ModelMetadataCard(
                     ) {
                         Icon(
                             Icons.Default.Close,
-                            contentDescription = null,
+                            contentDescription = "Dismiss metadata card",
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
@@ -125,7 +125,7 @@ fun ModelMetadataCard(
                     ) {
                         Icon(
                             Icons.Default.Info,
-                            contentDescription = null,
+                            contentDescription = "View model details",
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
@@ -296,7 +296,7 @@ private fun UnknownInfo(metadata: ModelMetadata.Unknown) {
     ) {
         Icon(
             imageVector = Icons.Default.HelpOutline,
-            contentDescription = null,
+            contentDescription = "Unknown model format",
             modifier = Modifier.size(48.dp),
             tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f)
         )
@@ -322,7 +322,7 @@ private fun ErrorInfo(metadata: ModelMetadata.Error) {
     ) {
         Icon(
             imageVector = Icons.Default.Error,
-            contentDescription = null,
+            contentDescription = "Metadata extraction error",
             modifier = Modifier.size(48.dp),
             tint = MaterialTheme.colorScheme.error
         )
@@ -352,7 +352,7 @@ private fun TensorSection(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = null,
+                contentDescription = "$title section",
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.primary
             )
@@ -429,7 +429,7 @@ private fun StatChip(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = null,
+                contentDescription = "$label statistic",
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.primary
             )

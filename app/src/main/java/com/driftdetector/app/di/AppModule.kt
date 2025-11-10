@@ -9,9 +9,14 @@ import com.driftdetector.app.core.cloud.CloudStorageManager
 import com.driftdetector.app.core.connectivity.NetworkConnectivityManager
 import com.driftdetector.app.core.drift.AttributionEngine
 import com.driftdetector.app.core.drift.DriftDetector
+import com.driftdetector.app.core.drift.InstantDriftFixManager
 import com.driftdetector.app.core.export.ModelExportManager
+import com.driftdetector.app.core.export.PatchExportManager
+import com.driftdetector.app.core.error.ErrorHandler
+import com.driftdetector.app.core.error.CircuitBreaker
 import com.driftdetector.app.core.ml.ModelMetadataExtractor
 import com.driftdetector.app.core.ml.TFLiteModelInference
+import com.driftdetector.app.core.monitoring.AccuracyMonitor
 import com.driftdetector.app.core.monitoring.ModelMonitoringService
 import com.driftdetector.app.core.notifications.DriftNotificationManager
 import com.driftdetector.app.core.patch.PatchEngine
@@ -19,6 +24,7 @@ import com.driftdetector.app.core.patch.PatchSynthesizer
 import com.driftdetector.app.core.patch.PatchValidator
 import com.driftdetector.app.core.patch.IntelligentPatchGenerator
 import com.driftdetector.app.core.patch.UltraAggressivePatchGenerator
+import com.driftdetector.app.core.patch.RealPatchApplicator
 import com.driftdetector.app.core.backup.AutomaticBackupManager
 import com.driftdetector.app.core.realtime.RealtimeClient
 import com.driftdetector.app.core.security.DifferentialPrivacy
@@ -29,6 +35,7 @@ import com.driftdetector.app.data.repository.DriftRepository
 import com.driftdetector.app.data.remote.DriftApiService
 import com.driftdetector.app.presentation.viewmodel.AIAssistantViewModel
 import com.driftdetector.app.presentation.viewmodel.DriftDashboardViewModel
+import com.driftdetector.app.presentation.viewmodel.InstantDriftFixViewModel
 import com.driftdetector.app.presentation.viewmodel.ModelManagementViewModel
 import com.driftdetector.app.presentation.viewmodel.ModelUploadViewModel
 import com.driftdetector.app.presentation.viewmodel.PatchManagementViewModel
@@ -227,6 +234,34 @@ val securityModule = module {
 val coreModule = module {
     Log.d("KOIN", "Loading coreModule...")
 
+    // Error Handling & Retry Logic
+    single {
+        try {
+            Log.d("KOIN", "Creating ErrorHandler...")
+            val errorHandler = ErrorHandler(androidContext())
+            Log.d("KOIN", "✓ ErrorHandler created")
+            errorHandler
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ ErrorHandler creation FAILED", e)
+            throw e
+        }
+    }
+
+    single {
+        try {
+            Log.d("KOIN", "Creating CircuitBreaker...")
+            val circuitBreaker = CircuitBreaker(
+                failureThreshold = 5,
+                resetTimeoutMs = 60000L // 1 minute
+            )
+            Log.d("KOIN", "✓ CircuitBreaker created")
+            circuitBreaker
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ CircuitBreaker creation FAILED", e)
+            throw e
+        }
+    }
+
     // Drift Detection
     single {
         Log.d("KOIN", "Creating DriftDetector...")
@@ -285,6 +320,19 @@ val coreModule = module {
         }
     }
 
+    // Patch Export Manager
+    single {
+        try {
+            Log.d("KOIN", "Creating PatchExportManager...")
+            val patchExportManager = PatchExportManager(androidContext())
+            Log.d("KOIN", "✓ PatchExportManager created")
+            patchExportManager
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ PatchExportManager creation FAILED", e)
+            throw e
+        }
+    }
+
     // Patch Management
     single {
         Log.d("KOIN", "Creating PatchEngine...")
@@ -326,6 +374,16 @@ val coreModule = module {
         }
     }
 
+    single {
+        Log.d("KOIN", "Creating RealPatchApplicator...")
+        try {
+            RealPatchApplicator(androidContext())
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ RealPatchApplicator creation FAILED", e)
+            throw e
+        }
+    }
+
     // File Upload Processor
     single {
         try {
@@ -349,7 +407,8 @@ val coreModule = module {
             Log.d("KOIN", "Creating ModelMonitoringService...")
             val service = ModelMonitoringService(
                 context = androidContext(),
-                repository = get()
+                repository = get(),
+                notificationManager = get()
             )
             Log.d("KOIN", "✓ ModelMonitoringService created")
             service
@@ -373,6 +432,18 @@ val coreModule = module {
     }
 
     single {
+        Log.d("KOIN", "Creating AccuracyMonitor...")
+        try {
+            val monitor = AccuracyMonitor()
+            Log.d("KOIN", "✓ AccuracyMonitor created")
+            monitor
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ AccuracyMonitor creation FAILED", e)
+            throw e
+        }
+    }
+
+    single {
         Log.d("KOIN", "Creating CloudStorageManager...")
         try {
             CloudStorageManager(androidContext())
@@ -388,7 +459,8 @@ val coreModule = module {
             Log.d("KOIN", "Creating AuthManager...")
             val authManager = AuthManager(
                 context = androidContext(),
-                gson = get()
+                gson = get(),
+                encryptionManager = get()
             )
             Log.d("KOIN", "✓ AuthManager created")
             authManager
@@ -429,14 +501,14 @@ val coreModule = module {
     single {
         try {
             Log.d("KOIN", "Creating RealtimeClient...")
-            // Default server URL - can be configured via settings
-            val serverUrl = "wss://api.driftdetector.example.com/realtime"
+            // Local development server - TRUE 24/7 monitoring!
+            val serverUrl = "ws://192.168.130.140:8080"
             val realtimeClient = RealtimeClient(
                 serverUrl = serverUrl,
                 authToken = null, // Will be set after authentication
                 gson = get()
             )
-            Log.d("KOIN", "✓ RealtimeClient created")
+            Log.d("KOIN", "✓ RealtimeClient created with URL: $serverUrl")
             realtimeClient
         } catch (e: Exception) {
             Log.e("KOIN", "✗ RealtimeClient creation FAILED", e)
@@ -449,12 +521,31 @@ val coreModule = module {
             Log.d("KOIN", "Creating AutomaticBackupManager...")
             val backupManager = AutomaticBackupManager(
                 context = androidContext(),
-                repository = get()
+                repository = get(),
+                encryptionManager = get()
             )
             Log.d("KOIN", "✓ AutomaticBackupManager created")
             backupManager
         } catch (e: Exception) {
             Log.e("KOIN", "✗ AutomaticBackupManager creation FAILED", e)
+            throw e
+        }
+    }
+
+    single {
+        Log.d("KOIN", "Creating InstantDriftFixManager...")
+        try {
+            InstantDriftFixManager(
+                context = androidContext(),
+                driftDetector = get(),
+                patchGenerator = get(),
+                patchValidator = get(),
+                patchApplicator = get(),
+                metadataExtractor = get(),
+                notificationManager = get()
+            )
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ InstantDriftFixManager creation FAILED", e)
             throw e
         }
     }
@@ -476,7 +567,9 @@ val repositoryModule = module {
                 patchSynthesizer = get(),
                 patchValidator = get(),
                 patchEngine = get(),
-                attributionEngine = get()
+                attributionEngine = get(),
+                context = androidContext(),
+                patchApplicator = get()
             )
             Log.d("KOIN", "✓ DriftRepository created")
             repo
@@ -493,7 +586,12 @@ val viewModelModule = module {
     viewModel {
         try {
             Log.d("KOIN", "Creating DriftDashboardViewModel...")
-            DriftDashboardViewModel(get(), get())
+            DriftDashboardViewModel(
+                repository = get(),
+                intelligentPatchGenerator = get(),
+                notificationManager = get(),
+                errorHandler = get()
+            )
         } catch (e: Exception) {
             Log.e("KOIN", "✗ DriftDashboardViewModel creation FAILED", e)
             throw e
@@ -516,7 +614,8 @@ val viewModelModule = module {
             ModelUploadViewModel(
                 fileUploadProcessor = get(),
                 context = androidContext(),
-                cloudStorageManager = get()
+                cloudStorageManager = get(),
+                errorHandler = get()
             )
         } catch (e: Exception) {
             Log.e("KOIN", "✗ ModelUploadViewModel creation FAILED", e)
@@ -527,7 +626,11 @@ val viewModelModule = module {
     viewModel {
         try {
             Log.d("KOIN", "Creating PatchManagementViewModel...")
-            PatchManagementViewModel(get())
+            PatchManagementViewModel(
+                repository = get(),
+                exportManager = get(),
+                errorHandler = get()
+            )
         } catch (e: Exception) {
             Log.e("KOIN", "✗ PatchManagementViewModel creation FAILED", e)
             throw e
@@ -537,7 +640,7 @@ val viewModelModule = module {
     viewModel {
         try {
             Log.d("KOIN", "Creating SettingsViewModel...")
-            SettingsViewModel(get(), androidContext())
+            SettingsViewModel(get(), androidContext(), get())
         } catch (e: Exception) {
             Log.e("KOIN", "✗ SettingsViewModel creation FAILED", e)
             throw e
@@ -550,6 +653,16 @@ val viewModelModule = module {
             AIAssistantViewModel(get())
         } catch (e: Exception) {
             Log.e("KOIN", "✗ AIAssistantViewModel creation FAILED", e)
+            throw e
+        }
+    }
+
+    viewModel {
+        try {
+            Log.d("KOIN", "Creating InstantDriftFixViewModel...")
+            InstantDriftFixViewModel(get())
+        } catch (e: Exception) {
+            Log.e("KOIN", "✗ InstantDriftFixViewModel creation FAILED", e)
             throw e
         }
     }

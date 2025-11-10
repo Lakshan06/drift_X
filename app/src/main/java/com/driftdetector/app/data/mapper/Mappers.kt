@@ -88,15 +88,15 @@ fun Patch.toEntity(): PatchEntity {
         createdAt = createdAt.toEpochMilli(),
         appliedAt = appliedAt?.toEpochMilli(),
         rolledBackAt = rolledBackAt?.toEpochMilli(),
-        configurationJson = gson.toJson(configuration),
+        configurationJson = serializePatchConfiguration(configuration, patchType),
         validationResultJson = validationResult?.let { gson.toJson(it) },
         metadataJson = gson.toJson(metadata)
     )
 }
 
 fun PatchEntity.toDomain(): Patch {
-    val patchType = PatchType.valueOf(patchType)
-    val configuration = gson.fromJson(configurationJson, PatchConfiguration::class.java)
+    val patchTypeEnum = PatchType.valueOf(patchType)
+    val configuration = deserializePatchConfiguration(configurationJson, patchTypeEnum)
     val validationResult = validationResultJson?.let {
         gson.fromJson(it, ValidationResult::class.java)
     }
@@ -106,7 +106,7 @@ fun PatchEntity.toDomain(): Patch {
         id = id,
         modelId = modelId,
         driftResultId = driftResultId,
-        patchType = patchType,
+        patchType = patchTypeEnum,
         status = PatchStatus.valueOf(status),
         createdAt = Instant.ofEpochMilli(createdAt),
         appliedAt = appliedAt?.let { Instant.ofEpochMilli(it) },
@@ -115,6 +115,90 @@ fun PatchEntity.toDomain(): Patch {
         validationResult = validationResult,
         metadata = gson.fromJson(metadataJson, metadataType) ?: emptyMap()
     )
+}
+
+/**
+ * Serialize PatchConfiguration based on type
+ */
+private fun serializePatchConfiguration(
+    configuration: PatchConfiguration,
+    patchType: PatchType
+): String {
+    return when (configuration) {
+        is PatchConfiguration.FeatureClipping -> gson.toJson(configuration)
+        is PatchConfiguration.FeatureReweighting -> gson.toJson(configuration)
+        is PatchConfiguration.ThresholdTuning -> gson.toJson(configuration)
+        is PatchConfiguration.NormalizationUpdate -> gson.toJson(configuration)
+    }
+}
+
+/**
+ * Deserialize PatchConfiguration based on patch type
+ * This prevents "abstract classes can't be instantiated" error
+ */
+private fun deserializePatchConfiguration(
+    configurationJson: String,
+    patchType: PatchType
+): PatchConfiguration {
+    return try {
+        when (patchType) {
+            PatchType.FEATURE_CLIPPING -> {
+                gson.fromJson(configurationJson, PatchConfiguration.FeatureClipping::class.java)
+            }
+
+            PatchType.FEATURE_REWEIGHTING -> {
+                gson.fromJson(configurationJson, PatchConfiguration.FeatureReweighting::class.java)
+            }
+
+            PatchType.THRESHOLD_TUNING -> {
+                gson.fromJson(configurationJson, PatchConfiguration.ThresholdTuning::class.java)
+            }
+
+            PatchType.NORMALIZATION_UPDATE -> {
+                gson.fromJson(configurationJson, PatchConfiguration.NormalizationUpdate::class.java)
+            }
+
+            PatchType.ENSEMBLE_REWEIGHT -> {
+                // Fallback to FeatureReweighting for now
+                gson.fromJson(configurationJson, PatchConfiguration.FeatureReweighting::class.java)
+            }
+
+            PatchType.CALIBRATION_ADJUST -> {
+                // Fallback to ThresholdTuning for now
+                gson.fromJson(configurationJson, PatchConfiguration.ThresholdTuning::class.java)
+            }
+        }
+    } catch (e: Exception) {
+        // Fallback to a default configuration if deserialization fails
+        android.util.Log.e("Mappers", "Failed to deserialize PatchConfiguration: ${e.message}")
+        // Return a safe default based on patch type
+        when (patchType) {
+            PatchType.FEATURE_CLIPPING -> PatchConfiguration.FeatureClipping(
+                featureIndices = emptyList(),
+                minValues = FloatArray(0),
+                maxValues = FloatArray(0)
+            )
+
+            PatchType.FEATURE_REWEIGHTING, PatchType.ENSEMBLE_REWEIGHT -> PatchConfiguration.FeatureReweighting(
+                featureIndices = emptyList(),
+                originalWeights = FloatArray(0),
+                newWeights = FloatArray(0)
+            )
+
+            PatchType.THRESHOLD_TUNING, PatchType.CALIBRATION_ADJUST -> PatchConfiguration.ThresholdTuning(
+                originalThreshold = 0.5f,
+                newThreshold = 0.5f
+            )
+
+            PatchType.NORMALIZATION_UPDATE -> PatchConfiguration.NormalizationUpdate(
+                featureIndices = emptyList(),
+                originalMeans = FloatArray(0),
+                originalStds = FloatArray(0),
+                newMeans = FloatArray(0),
+                newStds = FloatArray(0)
+            )
+        }
+    }
 }
 
 // ========== PatchSnapshot Mappers ==========

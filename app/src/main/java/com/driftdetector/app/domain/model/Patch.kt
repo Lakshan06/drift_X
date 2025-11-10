@@ -135,7 +135,8 @@ data class ValidationResult(
     val isValid: Boolean,
     val validatedAt: Instant,
     val metrics: ValidationMetrics,
-    val errors: List<String> = emptyList()
+    val errors: List<String> = emptyList(),
+    val warnings: List<String> = emptyList()
 )
 
 /**
@@ -149,7 +150,9 @@ data class ValidationMetrics(
     val driftScoreAfterPatch: Double,
     val driftReduction: Double,
     val performanceDelta: Double,
-    val safetyScore: Double  // Safety metric to prevent degradation
+    val safetyScore: Double,  // Safety metric to prevent degradation
+    val confidenceIntervalLower: Double = 0.0,
+    val confidenceIntervalUpper: Double = 0.0
 )
 
 /**
@@ -179,4 +182,32 @@ data class PatchSnapshot(
         result = 31 * result + postApplyState.contentHashCode()
         return result
     }
+}
+
+// ==================== Extension Functions for Human-Readable Descriptions ====================
+
+/**
+ * Get a user-friendly description of what this patch type does
+ */
+fun PatchType.getDescription(): String {
+    return when (this) {
+        PatchType.FEATURE_CLIPPING -> "Clips outlier values to safe ranges based on reference data"
+        PatchType.FEATURE_REWEIGHTING -> "Adjusts feature importance to reduce impact of drifted features"
+        PatchType.THRESHOLD_TUNING -> "Optimizes decision thresholds to account for data distribution changes"
+        PatchType.NORMALIZATION_UPDATE -> "Updates normalization parameters to align with current data distribution"
+        PatchType.ENSEMBLE_REWEIGHT -> "Rebalances ensemble model components for better performance"
+        PatchType.CALIBRATION_ADJUST -> "Recalibrates prediction probabilities to maintain accuracy"
+    }
+}
+
+/**
+ * Get a brief explanation suitable for notifications or quick views
+ */
+fun Patch.getBriefDescription(): String {
+    return "${patchType.getIcon()} ${
+        patchType.name.replace(
+            "_",
+            " "
+        )
+    }: ${configuration.getShortSummary()}"
 }

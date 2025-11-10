@@ -8,49 +8,255 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import timber.log.Timber
 import java.io.BufferedReader
+import java.io.IOException
 import java.io.InputStreamReader
 import kotlin.math.min
 
 /**
- * Enhanced data file parser supporting multiple formats:
+ * Enhanced data file parser supporting multiple formats with comprehensive validation:
  * - CSV (.csv)
  * - JSON (.json)
  * - TSV/Tab-delimited (.tsv, .txt)
  * - Excel-like formats (basic support)
  * - Pipe-delimited (.psv)
  * - Space-delimited (.dat)
+ *
+ * Features:
+ * - File corruption detection
+ * - Data quality validation
+ * - Format auto-detection
+ * - Detailed error reporting
  */
 class DataFileParser(private val context: Context) {
 
     /**
-     * Parse data file based on extension
+     * Exception types for detailed error handling
+     */
+    sealed class DataParsingException(message: String, cause: Throwable? = null) :
+        Exception(message, cause) {
+        class FileNotReadableException(uri: Uri) :
+            DataParsingException("File not readable or accessible: $uri")
+
+        class EmptyFileException :
+            DataParsingException("File is empty or contains no valid data")
+
+        class UnsupportedFormatException(format: String) :
+            DataParsingException("Unsupported file format: $format. Supported formats: CSV, JSON, TSV, TXT, PSV, DAT")
+
+        class CorruptedDataException(val corruptedRows: List<Int>, val totalRows: Int) :
+            DataParsingException(
+                "Data corruption detected: ${corruptedRows.size} of $totalRows rows are corrupted or malformed. " +
+                        "Corrupted row numbers: ${
+                            corruptedRows.take(10).joinToString(", ")
+                        }${if (corruptedRows.size > 10) "..." else ""}"
+            )
+
+        class InconsistentFeatureCountException(
+            val expectedCount: Int,
+            val inconsistentRows: Map<Int, Int>
+        ) :
+            DataParsingException(
+                "Inconsistent feature count: Expected $expectedCount features, but found ${inconsistentRows.size} rows with different counts. " +
+                        "Examples: ${
+                            inconsistentRows.entries.take(5)
+                                .joinToString(", ") { "row ${it.key} has ${it.value} features" }
+                        }"
+            )
+
+        class InvalidDataTypeException(row: Int, column: Int, value: String) :
+            DataParsingException("Invalid data type at row $row, column $column: Cannot convert '$value' to numeric value")
+
+        class InsufficientDataException(actualCount: Int, minimumRequired: Int) :
+            DataParsingException("Insufficient data: Found $actualCount samples, minimum required: $minimumRequired")
+
+        class UnexpectedErrorException(message: String, cause: Throwable?) :
+            DataParsingException("Unexpected error while parsing file: $message", cause)
+    }
+
+    /**
+     * Parse data file based on extension with comprehensive validation
      */
     fun parseFile(uri: Uri, fileName: String, expectedFeatures: Int): Result<List<FloatArray>> {
         return try {
             Timber.d("📊 Parsing data file: $fileName (expected $expectedFeatures features)")
 
+            // Step 1: Check file readability
+            if (!isFileReadable(uri)) {
+                return Result.failure(DataParsingException.FileNotReadableException(uri))
+            }
+
+            // Step 2: Detect and validate file format
+            val format = detectFileFormat(uri, fileName)
+            if (!isSupportedFormat(format)) {
+                return Result.failure(DataParsingException.UnsupportedFormatException(format))
+            }
+
+            // Step 3: Parse based on detected format
             val data = when {
                 fileName.endsWith(".csv", ignoreCase = true) -> parseCSV(uri, expectedFeatures)
                 fileName.endsWith(".json", ignoreCase = true) -> parseJSON(uri, expectedFeatures)
                 fileName.endsWith(".tsv", ignoreCase = true) -> parseTSV(uri, expectedFeatures)
                 fileName.endsWith(".txt", ignoreCase = true) -> parseTextFile(uri, expectedFeatures)
-                fileName.endsWith(".psv", ignoreCase = true) -> parsePipeSeparated(uri, expectedFeatures)
-                fileName.endsWith(".dat", ignoreCase = true) -> parseSpaceSeparated(uri, expectedFeatures)
+                fileName.endsWith(".psv", ignoreCase = true) -> parsePipeSeparated(
+                    uri,
+                    expectedFeatures
+                )
+
+                fileName.endsWith(".dat", ignoreCase = true) -> parseSpaceSeparated(
+                    uri,
+                    expectedFeatures
+                )
+
                 else -> parseAutoDetect(uri, expectedFeatures)
+            }
+
+            // Step 4: Validate data quality
+            validateDataQuality(data, expectedFeatures, fileName)?.let {
+                return Result.failure(it)
             }
 
             if (data.isEmpty()) {
                 Timber.w("⚠️ No valid data parsed, file might be empty or malformed")
-                Result.failure(Exception("No valid data found in file"))
-            } else {
-                Timber.i("✅ Successfully parsed ${data.size} rows with ${data.firstOrNull()?.size ?: 0} features")
-                Result.success(data)
+                return Result.failure(DataParsingException.EmptyFileException())
             }
 
+            Timber.i("✅ Successfully parsed ${data.size} rows with ${data.firstOrNull()?.size ?: 0} features")
+            Result.success(data)
+
+        } catch (e: DataParsingException) {
+            Timber.e(e, "❌ Data parsing error: ${e.message}")
+            Result.failure(e)
         } catch (e: Exception) {
             Timber.e(e, "❌ Failed to parse data file: $fileName")
-            Result.failure(e)
+            Result.failure(
+                DataParsingException.UnexpectedErrorException(e.message ?: "Unknown error", e)
+            )
         }
+    }
+
+    /**
+     * Check if file is readable and accessible
+     */
+    private fun isFileReadable(uri: Uri): Boolean {
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                stream.read() // Try to read at least one byte
+                true
+            } ?: false
+        } catch (e: IOException) {
+            Timber.e(e, "File not readable: $uri")
+            false
+        }
+    }
+
+    /**
+     * Detect file format from content
+     */
+    private fun detectFileFormat(uri: Uri, fileName: String): String {
+        val extension = fileName.substringAfterLast(".", "").lowercase()
+
+        // Also check content for better detection
+        try {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                val buffer = CharArray(100)
+                val reader = stream.bufferedReader()
+                val charsRead = reader.read(buffer, 0, 100)
+                val preview = if (charsRead > 0) String(buffer, 0, charsRead) else ""
+
+                when {
+                    preview.trim().startsWith("{") || preview.trim()
+                        .startsWith("[") -> return "json"
+
+                    preview.contains("\t") -> return "tsv"
+                    preview.contains("|") -> return "psv"
+                    preview.contains(",") -> return "csv"
+                }
+            }
+        } catch (e: IOException) {
+            Timber.w("Could not preview file content for format detection")
+        }
+
+        return extension
+    }
+
+    /**
+     * Check if format is supported
+     */
+    private fun isSupportedFormat(format: String): Boolean {
+        return format in listOf("csv", "json", "tsv", "txt", "psv", "dat")
+    }
+
+    /**
+     * Validate data quality and detect corruption
+     */
+    private fun validateDataQuality(
+        data: List<FloatArray>,
+        expectedFeatures: Int,
+        fileName: String
+    ): DataParsingException? {
+        if (data.isEmpty()) {
+            return DataParsingException.EmptyFileException()
+        }
+
+        // Minimum data requirement
+        val minimumSamples = 50
+        if (data.size < minimumSamples) {
+            return DataParsingException.InsufficientDataException(data.size, minimumSamples)
+        }
+
+        // Check for corrupted rows (NaN, Inf, or all zeros)
+        val corruptedRows = mutableListOf<Int>()
+        data.forEachIndexed { index, row ->
+            if (isCorruptedRow(row)) {
+                corruptedRows.add(index + 1)
+            }
+        }
+
+        if (corruptedRows.isNotEmpty() && corruptedRows.size > data.size * 0.1) {
+            // More than 10% corrupted is unacceptable
+            return DataParsingException.CorruptedDataException(corruptedRows, data.size)
+        }
+
+        // Check for inconsistent feature counts
+        val inconsistentRows = mutableMapOf<Int, Int>()
+        data.forEachIndexed { index, row ->
+            if (row.size != expectedFeatures) {
+                inconsistentRows[index + 1] = row.size
+            }
+        }
+
+        if (inconsistentRows.isNotEmpty() && inconsistentRows.size > data.size * 0.05) {
+            // More than 5% inconsistent is problematic
+            return DataParsingException.InconsistentFeatureCountException(
+                expectedFeatures,
+                inconsistentRows
+            )
+        }
+
+        // Check data ranges (detect if all features have same value - likely corrupt)
+        val allSameValue = data.all { row ->
+            row.distinct().size == 1
+        }
+
+        if (allSameValue && data.size > 10) {
+            Timber.w("⚠️ All samples have identical values - possible data corruption")
+            return DataParsingException.CorruptedDataException(
+                (1..data.size).toList(),
+                data.size
+            )
+        }
+
+        return null
+    }
+
+    /**
+     * Check if a row is corrupted
+     */
+    private fun isCorruptedRow(row: FloatArray): Boolean {
+        if (row.isEmpty()) return true
+
+        return row.any { it.isNaN() || it.isInfinite() } ||
+                row.all { it == 0f } // All zeros might indicate corruption
     }
 
     /**

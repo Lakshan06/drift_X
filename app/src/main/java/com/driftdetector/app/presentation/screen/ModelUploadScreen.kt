@@ -214,7 +214,7 @@ fun HeroSection() {
         ) {
             Icon(
                 imageVector = Icons.Default.CloudUpload,
-                contentDescription = null,
+                contentDescription = "Upload model to cloud",
                 modifier = Modifier
                     .size(64.dp)
                     .scale(scale),
@@ -341,7 +341,12 @@ fun UploadMethodCard(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = null,
+                contentDescription = when (method) {
+                    UploadMethod.LOCAL_FILE -> "Local file upload"
+                    UploadMethod.CLOUD_STORAGE -> "Cloud storage upload"
+                    UploadMethod.URL_IMPORT -> "URL import upload"
+                    UploadMethod.DRAG_DROP -> "Drag and drop upload"
+                },
                 modifier = Modifier.size(40.dp),
                 tint = if (isSelected) 
                     MaterialTheme.colorScheme.primary 
@@ -381,16 +386,13 @@ fun UploadMethodCard(
 fun LocalFileUploadSection(
     onFilesSelected: (List<Uri>) -> Unit
 ) {
-    val modelLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        uri?.let { onFilesSelected(listOf(it)) }
-    }
-    
-    val dataLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        uri?.let { onFilesSelected(listOf(it)) }
+    // Use OpenMultipleDocuments to allow selecting multiple files at once
+    val multipleFilesLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            onFilesSelected(uris)
+        }
     }
     
     Card(
@@ -401,18 +403,153 @@ fun LocalFileUploadSection(
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                "Select File Type",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
+            // Header with icon
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    Icons.Default.FolderOpen,
+                    contentDescription = "Browse local files",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+                Column {
+                    Text(
+                        "Select Files",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Choose both model and data files together",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Divider()
+
+            // Instructions Card
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = "Upload instructions",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            "📝 How to Upload",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Text(
+                        "1. Click the button below to open file picker",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        "2. Select your model file (e.g., model.tflite)",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        "3. Hold Ctrl/Cmd and click your data file (e.g., data.csv)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        "4. Click 'Open' to upload both files together",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.CloudDone,
+                                contentDescription = "Upload tip",
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                "💡 Tip: You can also select files one at a time",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Main Upload Button
+            Button(
+                onClick = {
+                    // Open file picker allowing multiple file selection
+                    multipleFilesLauncher.launch(arrayOf("*/*"))
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Icon(
+                    Icons.Default.FileUpload,
+                    contentDescription = "Upload file button",
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(
+                        "Select Model & Data Files",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Browse and select files",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
             
+            Divider()
+            
+            // Supported formats info
+            SupportedFormatsInfo()
+
+            Divider()
+
+            // Offline Access Note
             Surface(
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                shape = MaterialTheme.shapes.small,
-                modifier = Modifier.fillMaxWidth()
+                shape = MaterialTheme.shapes.small
             ) {
                 Row(
                     modifier = Modifier.padding(12.dp),
@@ -421,44 +558,17 @@ fun LocalFileUploadSection(
                 ) {
                     Icon(
                         Icons.Default.CloudDone,
-                        contentDescription = null,
+                        contentDescription = "Offline access available",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
-                        "Works offline! Access previously synced Google Drive files without internet",
+                        "Works offline! Access previously synced files from Google Drive, OneDrive, and Dropbox without internet connection.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
-            
-            OutlinedButton(
-                onClick = { 
-                    modelLauncher.launch(arrayOf("*/*"))
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.Memory, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Upload ML Model (.tflite, .onnx)")
-            }
-            
-            OutlinedButton(
-                onClick = { 
-                    dataLauncher.launch(arrayOf("*/*"))
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.TableChart, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Upload Dataset (.csv, .json, .parquet)")
-            }
-            
-            Divider()
-            
-            // Supported formats info
-            SupportedFormatsInfo()
         }
     }
 }
@@ -491,7 +601,7 @@ fun CloudStorageSection(
                     containerColor = Color(0xFF4285F4).copy(alpha = 0.1f)
                 )
             ) {
-                Icon(Icons.Default.CloudCircle, contentDescription = null)
+                Icon(Icons.Default.CloudCircle, contentDescription = "Google Drive")
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Connect Google Drive")
             }
@@ -504,7 +614,7 @@ fun CloudStorageSection(
                     containerColor = Color(0xFF0061FF).copy(alpha = 0.1f)
                 )
             ) {
-                Icon(Icons.Default.Cloud, contentDescription = null)
+                Icon(Icons.Default.Cloud, contentDescription = "Dropbox")
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Connect Dropbox")
             }
@@ -517,7 +627,7 @@ fun CloudStorageSection(
                     containerColor = Color(0xFF0078D4).copy(alpha = 0.1f)
                 )
             ) {
-                Icon(Icons.Default.Cloud, contentDescription = null)
+                Icon(Icons.Default.Cloud, contentDescription = "OneDrive")
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Connect OneDrive")
             }
@@ -558,7 +668,7 @@ fun UrlImportSection(
                 placeholder = { Text("https://example.com/model.tflite") },
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = {
-                    Icon(Icons.Default.Link, contentDescription = null)
+                    Icon(Icons.Default.Link, contentDescription = "URL link input")
                 },
                 isError = showError,
                 supportingText = if (showError) {
@@ -580,7 +690,7 @@ fun UrlImportSection(
                 modifier = Modifier.align(Alignment.End),
                 enabled = url.isNotBlank()
             ) {
-                Icon(Icons.Default.Download, contentDescription = null)
+                Icon(Icons.Default.Download, contentDescription = "Download from URL")
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Import from URL")
             }
@@ -646,7 +756,7 @@ fun DragDropSection(
             ) {
                 Icon(
                     imageVector = Icons.Default.FileUpload,
-                    contentDescription = null,
+                    contentDescription = "Drag and drop area",
                     modifier = Modifier.size(64.dp),
                     tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
                 )
@@ -669,7 +779,7 @@ fun DragDropSection(
                 FilledTonalButton(
                     onClick = { fileLauncher.launch(arrayOf("*/*")) }
                 ) {
-                    Icon(Icons.Default.FolderOpen, contentDescription = null)
+                    Icon(Icons.Default.FolderOpen, contentDescription = "Browse files button")
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Browse Files")
                 }
@@ -762,7 +872,11 @@ fun UploadedFileCard(
                             file.isModel -> Icons.Default.Memory
                             else -> Icons.Default.TableChart
                         },
-                        contentDescription = null,
+                        contentDescription = when {
+                            file.processed -> "File processed successfully"
+                            file.isModel -> "Model file"
+                            else -> "Data file"
+                        },
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -938,7 +1052,7 @@ fun FeatureItem(
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = null,
+            contentDescription = title,
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(24.dp)
         )
@@ -980,7 +1094,7 @@ private fun UploadErrorScreen(message: String) {
         ) {
             Icon(
                 imageVector = Icons.Default.Error,
-                contentDescription = null,
+                contentDescription = "Upload error",
                 modifier = Modifier.size(64.dp),
                 tint = MaterialTheme.colorScheme.error
             )
@@ -1070,7 +1184,7 @@ fun MessageCard(
             ) {
                 Icon(
                     imageVector = if (errorMessage != null) Icons.Default.Error else Icons.Default.CheckCircle,
-                    contentDescription = null,
+                    contentDescription = if (errorMessage != null) "Error message" else "Success message",
                     tint = if (errorMessage != null) 
                         MaterialTheme.colorScheme.error 
                     else 
@@ -1100,31 +1214,30 @@ fun ProcessingResultsCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (driftResult.isDriftDetected) 
-                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-            else 
-                MaterialTheme.colorScheme.primaryContainer
+            containerColor = if (driftResult.isDriftDetected)
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
+            else
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
         )
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Icon(
                     imageVector = if (driftResult.isDriftDetected) Icons.Default.Warning else Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = if (driftResult.isDriftDetected) 
-                        MaterialTheme.colorScheme.error 
-                    else 
+                    contentDescription = if (driftResult.isDriftDetected) "Drift warning" else "No drift detected",
+                    tint = if (driftResult.isDriftDetected)
+                        MaterialTheme.colorScheme.error
+                    else
                         MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp)
                 )
-                
+
                 Column {
                     Text(
                         "Processing Results",
@@ -1217,7 +1330,7 @@ fun ProcessingResultsCard(
                         onClick = { /* Navigate to dashboard */ },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.Dashboard, contentDescription = null)
+                        Icon(Icons.Default.Dashboard, contentDescription = "View dashboard")
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("View Dashboard")
                     }
@@ -1227,7 +1340,7 @@ fun ProcessingResultsCard(
                             onClick = { /* Navigate to patches */ },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Default.Build, contentDescription = null)
+                            Icon(Icons.Default.Build, contentDescription = "View patches")
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("View Patches")
                         }
@@ -1256,7 +1369,7 @@ fun ModelRegisteredCard(model: MLModel) {
             ) {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
-                    contentDescription = null,
+                    contentDescription = "Model registered successfully",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp)
                 )
@@ -1325,14 +1438,14 @@ fun ModelRegisteredCard(model: MLModel) {
                     ) {
                         Icon(
                             Icons.Default.Info,
-                            contentDescription = null,
+                            contentDescription = "Next steps information",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
                             "Next Steps",
                             style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.Bold
                         )
                     }
                     
@@ -1356,7 +1469,7 @@ fun ModelRegisteredCard(model: MLModel) {
                 onClick = { /* Will be handled by navigation */ },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Default.Dashboard, contentDescription = null)
+                Icon(Icons.Default.Dashboard, contentDescription = "Go to dashboard")
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Go to Dashboard")
             }
@@ -1387,3 +1500,5 @@ fun ResultRow(
         )
     }
 }
+
+
