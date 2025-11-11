@@ -44,7 +44,8 @@ class InstantDriftFixManager(
         val modelInfo: ModelInfo? = null,
         val driftResult: DriftResult? = null,
         val patches: List<PatchCandidate> = emptyList(),
-        val error: String? = null
+        val error: String? = null,
+        val columnNames: List<String> = emptyList()
     )
 
     /**
@@ -110,17 +111,13 @@ class InstantDriftFixManager(
             Timber.d("🔍 Starting AI-powered instant drift analysis...")
             val startTime = System.currentTimeMillis()
 
-            // Extract model metadata
-            val modelMetadata = metadataExtractor.extractMetadata(modelUri)
-            val modelInfo = convertToModelInfo(modelMetadata, modelFileName)
-
-            Timber.d("📊 Model: ${modelInfo.name} (${modelInfo.framework})")
-
-            // Parse data file
-            val parseResult =
-                dataParser.parseFile(dataUri, dataFileName, modelInfo.inputFeatures.size)
-            if (parseResult.isFailure) {
-                val error = "Failed to parse data file: ${parseResult.exceptionOrNull()?.message}"
+            // FIXED: Parse data file FIRST to determine feature count
+            Timber.d("📊 Parsing data file to determine feature dimensions...")
+            val initialParseResult =
+                dataParser.parseFile(dataUri, dataFileName, expectedFeatures = 0)
+            if (initialParseResult.isFailure) {
+                val error =
+                    "Failed to parse data file: ${initialParseResult.exceptionOrNull()?.message}"
                 Timber.e(error)
                 return@withContext InstantFixResult(
                     success = false,
@@ -129,8 +126,36 @@ class InstantDriftFixManager(
                 )
             }
 
-            val data = parseResult.getOrThrow()
-            Timber.d("📈 Parsed ${data.size} data points")
+            val parsedData = initialParseResult.getOrThrow()
+            val data = parsedData.data
+            val originalColumnNames = parsedData.columnNames
+            val detectedFeatureCount = data.firstOrNull()?.size ?: 0
+
+            if (detectedFeatureCount == 0) {
+                val error = "Data file contains no features"
+                Timber.e(error)
+                return@withContext InstantFixResult(
+                    success = false,
+                    message = error,
+                    error = error
+                )
+            }
+
+            Timber.d("📈 Detected $detectedFeatureCount features from data (${data.size} samples)")
+            if (originalColumnNames.isNotEmpty()) {
+                Timber.d(
+                    "📋 Original column names: ${
+                        originalColumnNames.take(5).joinToString(", ")
+                    }${if (originalColumnNames.size > 5) "..." else ""}"
+                )
+            }
+
+            // Extract model metadata
+            val modelMetadata = metadataExtractor.extractMetadata(modelUri)
+            val modelInfo = convertToModelInfo(modelMetadata, modelFileName, detectedFeatureCount)
+
+            Timber.d("📊 Model: ${modelInfo.name} (${modelInfo.framework}, ${modelInfo.inputFeatures.size} features)")
+            Timber.d("📊 Features: ${modelInfo.inputFeatures.size}")
 
             // Validate model-data compatibility
             val compatibilityCheck = validateModelDataCompatibility(modelInfo, data)
@@ -156,12 +181,19 @@ class InstantDriftFixManager(
             val referenceData = data.take(splitIndex)
             val currentData = data.drop(splitIndex)
 
+            // Use original column names if available, otherwise use model info or generate defaults
+            val featureNames = when {
+                originalColumnNames.isNotEmpty() -> originalColumnNames
+                modelInfo.inputFeatures.isNotEmpty() -> modelInfo.inputFeatures
+                else -> List(detectedFeatureCount) { "feature_$it" }
+            }
+
             // Detect drift
             val driftResult = driftDetector.detectDrift(
                 modelId = "instant_${UUID.randomUUID()}",
                 referenceData = referenceData,
                 currentData = currentData,
-                featureNames = modelInfo.inputFeatures
+                featureNames = featureNames
             )
 
             Timber.i("✅ Drift detection complete: score=${driftResult.driftScore}, detected=${driftResult.isDriftDetected}")
@@ -216,7 +248,8 @@ class InstantDriftFixManager(
                 message = "AI analysis complete in ${elapsedTime}ms",
                 modelInfo = modelInfo,
                 driftResult = driftResult,
-                patches = patches
+                patches = patches,
+                columnNames = featureNames
             )
 
         } catch (e: Exception) {
@@ -283,15 +316,31 @@ class InstantDriftFixManager(
         dataUri: Uri,
         dataFileName: String,
         selectedPatches: List<PatchCandidate>,
-        driftResult: DriftResult
+        driftResult: DriftResult,
+        columnNames: List<String> = emptyList()
     ): PatchedFilesResult = withContext(Dispatchers.IO) {
         try {
             Timber.d("🔨 Applying ${selectedPatches.size} patches with validation...")
 
             // Parse full dataset
-            val originalData =
+            val parsedDataResult =
                 dataParser.parseFile(dataUri, dataFileName, driftResult.featureDrifts.size)
                     .getOrThrow()
+
+            val originalData = parsedDataResult.data
+
+            // Use provided column names or fall back to parsed ones
+            val finalColumnNames = when {
+                columnNames.isNotEmpty() -> columnNames
+                parsedDataResult.columnNames.isNotEmpty() -> parsedDataResult.columnNames
+                else -> List(originalData.firstOrNull()?.size ?: 0) { "feature_$it" }
+            }
+
+            Timber.d(
+                "📋 Using column names: ${
+                    finalColumnNames.take(5).joinToString(", ")
+                }${if (finalColumnNames.size > 5) "..." else ""}"
+            )
 
             // FIXED: More lenient validation split - use smaller validation set or skip validation
             val hasEnoughData = originalData.size >= 100
@@ -523,7 +572,7 @@ class InstantDriftFixManager(
                 outputDir,
                 dataFileName.substringBeforeLast(".") + "_patched." + dataFileName.substringAfterLast(".")
             )
-            exportDataToFile(finalData, patchedDataFile, dataFileName)
+            exportDataToFile(finalData, patchedDataFile, finalColumnNames, dataFileName)
 
             // Calculate drift reduction
             val originalDrift = driftResult.driftScore
@@ -617,14 +666,26 @@ class InstantDriftFixManager(
     /**
      * Export transformed data to file
      */
-    private fun exportDataToFile(data: List<FloatArray>, file: File, originalFileName: String) {
+    private fun exportDataToFile(
+        data: List<FloatArray>,
+        file: File,
+        columnNames: List<String>,
+        originalFileName: String
+    ) {
         val format = originalFileName.substringAfterLast(".", "csv").lowercase()
+
+        // Generate column names if not provided
+        val finalColumnNames = if (columnNames.isEmpty()) {
+            List(data.firstOrNull()?.size ?: 0) { "feature_$it" }
+        } else {
+            columnNames
+        }
 
         when (format) {
             "csv" -> {
                 FileOutputStream(file).bufferedWriter().use { writer ->
                     // Write header
-                    writer.write(data.first().indices.joinToString(",") { "feature_$it" })
+                    writer.write(finalColumnNames.joinToString(","))
                     writer.newLine()
                     // Write data
                     data.forEach { sample ->
@@ -640,7 +701,9 @@ class InstantDriftFixManager(
                     data.forEachIndexed { index, sample ->
                         writer.write("  {")
                         sample.forEachIndexed { i, value ->
-                            writer.write("\"feature_$i\": $value")
+                            val colName =
+                                if (i < finalColumnNames.size) finalColumnNames[i] else "feature_$i"
+                            writer.write("\"$colName\": $value")
                             if (i < sample.size - 1) writer.write(", ")
                         }
                         writer.write("}")
@@ -653,7 +716,7 @@ class InstantDriftFixManager(
 
             else -> {
                 // Default to CSV
-                exportDataToFile(data, file, "data.csv")
+                exportDataToFile(data, file, finalColumnNames, "data.csv")
             }
         }
     }
@@ -663,7 +726,8 @@ class InstantDriftFixManager(
      */
     private fun convertToModelInfo(
         metadata: com.driftdetector.app.core.ml.ModelMetadata,
-        fileName: String
+        fileName: String,
+        detectedFeatureCount: Int
     ): ModelInfo {
         return when (metadata) {
             is com.driftdetector.app.core.ml.ModelMetadata.TensorFlowLite -> {
@@ -704,7 +768,7 @@ class InstantDriftFixManager(
                 ModelInfo(
                     name = fileName.substringBeforeLast("."),
                     format = fileName.substringAfterLast("."),
-                    inputFeatures = List(4) { "feature_$it" },
+                    inputFeatures = List(detectedFeatureCount) { "feature_$it" },
                     outputLabels = listOf("class_0", "class_1"),
                     framework = "Unknown"
                 )

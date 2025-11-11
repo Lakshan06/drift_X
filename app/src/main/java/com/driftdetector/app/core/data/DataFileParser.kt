@@ -26,6 +26,7 @@ import kotlin.math.min
  * - Data quality validation
  * - Format auto-detection
  * - Detailed error reporting
+ * - Column name preservation
  */
 class DataFileParser(private val context: Context) {
 
@@ -74,9 +75,18 @@ class DataFileParser(private val context: Context) {
     }
 
     /**
+     * Parsed data with column names preserved
+     */
+    data class ParsedData(
+        val data: List<FloatArray>,
+        val columnNames: List<String>,
+        val hasHeader: Boolean
+    )
+
+    /**
      * Parse data file based on extension with comprehensive validation
      */
-    fun parseFile(uri: Uri, fileName: String, expectedFeatures: Int): Result<List<FloatArray>> {
+    fun parseFile(uri: Uri, fileName: String, expectedFeatures: Int): Result<ParsedData> {
         return try {
             Timber.d("📊 Parsing data file: $fileName (expected $expectedFeatures features)")
 
@@ -92,7 +102,7 @@ class DataFileParser(private val context: Context) {
             }
 
             // Step 3: Parse based on detected format
-            val data = when {
+            val parsedData = when {
                 fileName.endsWith(".csv", ignoreCase = true) -> parseCSV(uri, expectedFeatures)
                 fileName.endsWith(".json", ignoreCase = true) -> parseJSON(uri, expectedFeatures)
                 fileName.endsWith(".tsv", ignoreCase = true) -> parseTSV(uri, expectedFeatures)
@@ -111,17 +121,22 @@ class DataFileParser(private val context: Context) {
             }
 
             // Step 4: Validate data quality
-            validateDataQuality(data, expectedFeatures, fileName)?.let {
+            validateDataQuality(
+                parsedData.data,
+                expectedFeatures,
+                fileName,
+                parsedData.hasHeader
+            )?.let {
                 return Result.failure(it)
             }
 
-            if (data.isEmpty()) {
+            if (parsedData.data.isEmpty()) {
                 Timber.w("⚠️ No valid data parsed, file might be empty or malformed")
                 return Result.failure(DataParsingException.EmptyFileException())
             }
 
-            Timber.i("✅ Successfully parsed ${data.size} rows with ${data.firstOrNull()?.size ?: 0} features")
-            Result.success(data)
+            Timber.i("✅ Successfully parsed ${parsedData.data.size} rows with ${parsedData.data.firstOrNull()?.size ?: 0} features")
+            Result.success(parsedData)
 
         } catch (e: DataParsingException) {
             Timber.e(e, "❌ Data parsing error: ${e.message}")
@@ -192,19 +207,21 @@ class DataFileParser(private val context: Context) {
     private fun validateDataQuality(
         data: List<FloatArray>,
         expectedFeatures: Int,
-        fileName: String
+        fileName: String,
+        hasHeader: Boolean
     ): DataParsingException? {
         if (data.isEmpty()) {
             return DataParsingException.EmptyFileException()
         }
 
         // Minimum data requirement
-        val minimumSamples = 50
+        val minimumSamples = 20
         if (data.size < minimumSamples) {
-            return DataParsingException.InsufficientDataException(data.size, minimumSamples)
+            Timber.w("⚠️ Dataset has only ${data.size} samples, minimum recommended is $minimumSamples but proceeding anyway")
+            // Don't fail, just warn
         }
 
-        // Check for corrupted rows (NaN, Inf, or all zeros)
+        // Check for corrupted rows (NaN, Inf only - not zeros)
         val corruptedRows = mutableListOf<Int>()
         data.forEachIndexed { index, row ->
             if (isCorruptedRow(row)) {
@@ -212,38 +229,44 @@ class DataFileParser(private val context: Context) {
             }
         }
 
-        if (corruptedRows.isNotEmpty() && corruptedRows.size > data.size * 0.1) {
-            // More than 10% corrupted is unacceptable
+        // Only fail if significant portion has NaN/Inf (>30% truly corrupted)
+        if (corruptedRows.isNotEmpty() && corruptedRows.size > data.size * 0.3) {
             return DataParsingException.CorruptedDataException(corruptedRows, data.size)
+        }
+
+        // If expectedFeatures is 0 (auto-detect mode), determine from first row
+        val actualExpectedFeatures = if (expectedFeatures == 0) {
+            data.firstOrNull()?.size ?: 0
+        } else {
+            expectedFeatures
         }
 
         // Check for inconsistent feature counts
         val inconsistentRows = mutableMapOf<Int, Int>()
         data.forEachIndexed { index, row ->
-            if (row.size != expectedFeatures) {
+            if (actualExpectedFeatures > 0 && row.size != actualExpectedFeatures) {
                 inconsistentRows[index + 1] = row.size
             }
         }
 
-        if (inconsistentRows.isNotEmpty() && inconsistentRows.size > data.size * 0.05) {
-            // More than 5% inconsistent is problematic
+        // Only fail if more than 20% of rows have wrong feature count
+        if (inconsistentRows.isNotEmpty() && inconsistentRows.size > data.size * 0.2) {
             return DataParsingException.InconsistentFeatureCountException(
-                expectedFeatures,
+                actualExpectedFeatures,
                 inconsistentRows
             )
         }
 
-        // Check data ranges (detect if all features have same value - likely corrupt)
-        val allSameValue = data.all { row ->
+        // Remove the overly strict "all same value" check
+        // Some datasets legitimately have constant values or normalized data
+        // Only warn, don't fail
+        val allSameValue = data.size > 10 && data.all { row ->
             row.distinct().size == 1
         }
 
-        if (allSameValue && data.size > 10) {
-            Timber.w("⚠️ All samples have identical values - possible data corruption")
-            return DataParsingException.CorruptedDataException(
-                (1..data.size).toList(),
-                data.size
-            )
+        if (allSameValue) {
+            Timber.w("⚠️ All samples have identical values - this may be expected for some datasets")
+            // Don't fail, just warn
         }
 
         return null
@@ -255,30 +278,46 @@ class DataFileParser(private val context: Context) {
     private fun isCorruptedRow(row: FloatArray): Boolean {
         if (row.isEmpty()) return true
 
-        return row.any { it.isNaN() || it.isInfinite() } ||
-                row.all { it == 0f } // All zeros might indicate corruption
+        // Only flag rows with NaN or Infinity - all zeros can be valid data
+        return row.any { it.isNaN() || it.isInfinite() }
     }
 
     /**
      * Parse CSV file with enhanced features
      */
-    private fun parseCSV(uri: Uri, expectedFeatures: Int): List<FloatArray> {
+    private fun parseCSV(uri: Uri, expectedFeatures: Int): ParsedData {
         val data = mutableListOf<FloatArray>()
+        var columnNames: List<String> = emptyList()
+        var hasHeader = false
 
         try {
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
                 BufferedReader(InputStreamReader(inputStream)).use { reader ->
                     var line = reader.readLine()
-                    var hasHeader = false
-
-                    // Detect header (contains letters or non-numeric first cell)
                     if (line != null) {
                         val firstCell = line.split(",").firstOrNull()?.trim() ?: ""
                         hasHeader = firstCell.any { it.isLetter() } || firstCell.isEmpty()
 
                         if (hasHeader) {
                             Timber.d("📋 Detected CSV header: ${line.take(100)}")
+                            columnNames = line.split(",").map { it.trim().replace("\"", "") }
                             line = reader.readLine()
+                        }
+                    }
+
+                    // FIXED: Auto-detect feature count from first data row if expectedFeatures is 0
+                    var actualFeatureCount = expectedFeatures
+                    if (actualFeatureCount == 0 && line != null) {
+                        val firstRow = parseCSVRow(line, 1000) // Parse with large max
+                        if (firstRow != null && firstRow.isNotEmpty()) {
+                            actualFeatureCount = firstRow.size
+                            Timber.d("📊 Auto-detected $actualFeatureCount features from first data row")
+
+                            // Generate default column names if no header was found
+                            if (columnNames.isEmpty()) {
+                                columnNames = List(actualFeatureCount) { "feature_$it" }
+                                Timber.d("📋 Generated default column names for $actualFeatureCount features")
+                            }
                         }
                     }
 
@@ -287,12 +326,23 @@ class DataFileParser(private val context: Context) {
                     while (line != null) {
                         rowCount++
                         try {
-                            val row = parseCSVRow(line, expectedFeatures)
-                            if (row != null && row.size == expectedFeatures) {
-                                data.add(row)
-                            } else if (row != null) {
-                                Timber.w("⚠️ Row $rowCount has ${row.size} features, expected $expectedFeatures - padding/truncating")
-                                data.add(normalizeFeatureCount(row, expectedFeatures))
+                            val row = parseCSVRow(
+                                line,
+                                if (actualFeatureCount > 0) actualFeatureCount else 1000
+                            )
+                            if (row != null && row.isNotEmpty()) {
+                                // FIXED: Accept rows even if feature count differs slightly
+                                if (actualFeatureCount > 0) {
+                                    if (row.size == actualFeatureCount) {
+                                        data.add(row)
+                                    } else {
+                                        // Normalize to expected count
+                                        data.add(normalizeFeatureCount(row, actualFeatureCount))
+                                    }
+                                } else {
+                                    // No expected count, accept as-is
+                                    data.add(row)
+                                }
                             }
                         } catch (e: Exception) {
                             Timber.w("⚠️ Skipping invalid row $rowCount: ${e.message}")
@@ -308,13 +358,22 @@ class DataFileParser(private val context: Context) {
             Timber.e(e, "Failed to read CSV file")
         }
 
-        return data
+        // Ensure column names match data dimensions
+        if (data.isNotEmpty() && columnNames.size != data.first().size) {
+            val actualSize = data.first().size
+            Timber.w("⚠️ Column name count (${columnNames.size}) doesn't match data dimensions ($actualSize), regenerating")
+            columnNames = List(actualSize) { i ->
+                if (i < columnNames.size) columnNames[i] else "feature_$i"
+            }
+        }
+
+        return ParsedData(data, columnNames, hasHeader)
     }
 
     /**
      * Parse CSV row handling quoted values and edge cases
      */
-    private fun parseCSVRow(line: String, expectedFeatures: Int): FloatArray? {
+    private fun parseCSVRow(line: String, maxFeatures: Int): FloatArray? {
         val values = mutableListOf<String>()
         var currentValue = StringBuilder()
         var insideQuotes = false
@@ -326,6 +385,7 @@ class DataFileParser(private val context: Context) {
                     values.add(currentValue.toString().trim())
                     currentValue = StringBuilder()
                 }
+
                 else -> currentValue.append(char)
             }
         }
@@ -333,11 +393,19 @@ class DataFileParser(private val context: Context) {
 
         // Convert to floats
         return try {
-            values.take(expectedFeatures)
+            // FIXED: Take up to maxFeatures, but parse all valid numeric values
+            values.take(maxFeatures)
                 .map { it.replace("\"", "").trim() }
                 .filter { it.isNotEmpty() }
-                .map { parseNumeric(it) }
+                .mapNotNull {
+                    try {
+                        parseNumeric(it)
+                    } catch (e: Exception) {
+                        null // Skip non-numeric values
+                    }
+                }
                 .toFloatArray()
+                .takeIf { it.isNotEmpty() } // Only return if we got at least one value
         } catch (e: Exception) {
             null
         }
@@ -346,8 +414,10 @@ class DataFileParser(private val context: Context) {
     /**
      * Parse JSON file (multiple formats supported)
      */
-    private fun parseJSON(uri: Uri, expectedFeatures: Int): List<FloatArray> {
+    private fun parseJSON(uri: Uri, expectedFeatures: Int): ParsedData {
         val data = mutableListOf<FloatArray>()
+        val columnNames = mutableListOf<String>()
+        var hasHeader = false
 
         try {
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -361,26 +431,94 @@ class DataFileParser(private val context: Context) {
                         when {
                             obj.has("data") -> {
                                 val dataArray = obj.getAsJsonArray("data")
-                                parseJsonArray(dataArray, expectedFeatures, data)
+                                // Check if there's a columns field
+                                if (obj.has("columns")) {
+                                    hasHeader = true
+                                    val colArray = obj.getAsJsonArray("columns")
+                                    colArray.forEach { columnNames.add(it.asString) }
+                                }
+                                parseJsonArray(
+                                    dataArray,
+                                    expectedFeatures,
+                                    data,
+                                    columnNames,
+                                    hasHeader
+                                )
                             }
                             obj.has("values") -> {
                                 val dataArray = obj.getAsJsonArray("values")
-                                parseJsonArray(dataArray, expectedFeatures, data)
+                                if (obj.has("columns")) {
+                                    hasHeader = true
+                                    val colArray = obj.getAsJsonArray("columns")
+                                    colArray.forEach { columnNames.add(it.asString) }
+                                }
+                                parseJsonArray(
+                                    dataArray,
+                                    expectedFeatures,
+                                    data,
+                                    columnNames,
+                                    hasHeader
+                                )
                             }
                             obj.has("rows") -> {
                                 val dataArray = obj.getAsJsonArray("rows")
-                                parseJsonArray(dataArray, expectedFeatures, data)
+                                if (obj.has("columns")) {
+                                    hasHeader = true
+                                    val colArray = obj.getAsJsonArray("columns")
+                                    colArray.forEach { columnNames.add(it.asString) }
+                                }
+                                parseJsonArray(
+                                    dataArray,
+                                    expectedFeatures,
+                                    data,
+                                    columnNames,
+                                    hasHeader
+                                )
                             }
                             else -> {
                                 // Try to parse object as single row
                                 val row = parseJsonObjectAsRow(obj, expectedFeatures)
-                                if (row != null) data.add(row)
+                                if (row != null) {
+                                    data.add(row)
+                                    // Extract column names from object keys
+                                    if (columnNames.isEmpty()) {
+                                        hasHeader = true
+                                        obj.entrySet().sortedBy { it.key }.forEach { entry ->
+                                            try {
+                                                entry.value.asFloat // Test if numeric
+                                                columnNames.add(entry.key)
+                                            } catch (e: Exception) {
+                                                // Skip non-numeric values
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                     // Format 2: [[1,2,3], [4,5,6]]
                     jsonElement.isJsonArray -> {
-                        parseJsonArray(jsonElement.asJsonArray, expectedFeatures, data)
+                        val array = jsonElement.asJsonArray
+                        // Check if first element is object (has column names as keys)
+                        if (array.size() > 0 && array[0].isJsonObject) {
+                            val firstObj = array[0].asJsonObject
+                            hasHeader = true
+                            firstObj.entrySet().sortedBy { it.key }.forEach { entry ->
+                                try {
+                                    entry.value.asFloat // Test if numeric
+                                    columnNames.add(entry.key)
+                                } catch (e: Exception) {
+                                    // Skip non-numeric values
+                                }
+                            }
+                        }
+                        parseJsonArray(
+                            array,
+                            expectedFeatures,
+                            data,
+                            columnNames,
+                            hasHeader
+                        )
                     }
                 }
 
@@ -390,7 +528,22 @@ class DataFileParser(private val context: Context) {
             Timber.e(e, "Failed to parse JSON file")
         }
 
-        return data
+        // Ensure column names match data dimensions
+        if (data.isNotEmpty() && columnNames.size != data.first().size) {
+            val actualSize = data.first().size
+            Timber.w("⚠️ Column name count (${columnNames.size}) doesn't match data dimensions ($actualSize), regenerating")
+            columnNames.clear()
+            columnNames.addAll(List(actualSize) { i ->
+                if (i < columnNames.size) columnNames[i] else "feature_$i"
+            })
+        } else if (data.isNotEmpty() && columnNames.isEmpty()) {
+            // Generate default column names if none were found
+            val actualSize = data.first().size
+            Timber.d("📋 Generating default column names for $actualSize features")
+            columnNames.addAll(List(actualSize) { "feature_$it" })
+        }
+
+        return ParsedData(data, columnNames.toList(), hasHeader)
     }
 
     /**
@@ -399,7 +552,9 @@ class DataFileParser(private val context: Context) {
     private fun parseJsonArray(
         jsonArray: JsonArray,
         expectedFeatures: Int,
-        data: MutableList<FloatArray>
+        data: MutableList<FloatArray>,
+        columnNames: MutableList<String>,
+        hasHeader: Boolean
     ) {
         for (element in jsonArray) {
             when {
@@ -471,21 +626,21 @@ class DataFileParser(private val context: Context) {
     /**
      * Parse TSV (tab-separated values)
      */
-    private fun parseTSV(uri: Uri, expectedFeatures: Int): List<FloatArray> {
+    private fun parseTSV(uri: Uri, expectedFeatures: Int): ParsedData {
         return parseDelimitedFile(uri, '\t', expectedFeatures, "TSV")
     }
 
     /**
      * Parse pipe-separated values
      */
-    private fun parsePipeSeparated(uri: Uri, expectedFeatures: Int): List<FloatArray> {
+    private fun parsePipeSeparated(uri: Uri, expectedFeatures: Int): ParsedData {
         return parseDelimitedFile(uri, '|', expectedFeatures, "PSV")
     }
 
     /**
      * Parse space-separated values
      */
-    private fun parseSpaceSeparated(uri: Uri, expectedFeatures: Int): List<FloatArray> {
+    private fun parseSpaceSeparated(uri: Uri, expectedFeatures: Int): ParsedData {
         return parseDelimitedFile(uri, ' ', expectedFeatures, "Space-delimited", skipMultiple = true)
     }
 
@@ -498,8 +653,10 @@ class DataFileParser(private val context: Context) {
         expectedFeatures: Int,
         formatName: String,
         skipMultiple: Boolean = false
-    ): List<FloatArray> {
+    ): ParsedData {
         val data = mutableListOf<FloatArray>()
+        var columnNames: List<String> = emptyList()
+        var hasHeader = false
 
         try {
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -508,7 +665,49 @@ class DataFileParser(private val context: Context) {
 
                     // Skip header if present
                     if (line?.any { it.isLetter() && !it.isWhitespace() } == true) {
+                        hasHeader = true
+                        columnNames = if (skipMultiple) {
+                            line.split(Regex("\\s+"))
+                        } else {
+                            line.split(delimiter)
+                        }.map { it.trim().replace("\"", "") }
                         line = reader.readLine()
+                    }
+
+                    // FIXED: Auto-detect feature count from first data row if expectedFeatures is 0
+                    var actualFeatureCount = expectedFeatures
+                    if (actualFeatureCount == 0 && line != null) {
+                        try {
+                            val parts = if (skipMultiple) {
+                                line.split(Regex("\\s+"))
+                            } else {
+                                line.split(delimiter)
+                            }
+
+                            val firstRowValues = parts
+                                .map { it.trim() }
+                                .filter { it.isNotEmpty() }
+                                .mapNotNull {
+                                    try {
+                                        parseNumeric(it)
+                                    } catch (e: Exception) {
+                                        null
+                                    }
+                                }
+
+                            if (firstRowValues.isNotEmpty()) {
+                                actualFeatureCount = firstRowValues.size
+                                Timber.d(" Auto-detected $actualFeatureCount features from first data row")
+
+                                // Generate default column names if no header was found
+                                if (columnNames.isEmpty()) {
+                                    columnNames = List(actualFeatureCount) { "feature_$it" }
+                                    Timber.d("📋 Generated default column names for $actualFeatureCount features")
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Timber.w("Could not auto-detect feature count: ${e.message}")
+                        }
                     }
 
                     while (line != null) {
@@ -522,14 +721,27 @@ class DataFileParser(private val context: Context) {
                             val values = parts
                                 .map { it.trim() }
                                 .filter { it.isNotEmpty() }
-                                .take(expectedFeatures)
-                                .map { parseNumeric(it) }
+                                .mapNotNull {
+                                    try {
+                                        parseNumeric(it)
+                                    } catch (e: Exception) {
+                                        null
+                                    }
+                                }
                                 .toFloatArray()
 
-                            if (values.size == expectedFeatures) {
-                                data.add(values)
-                            } else if (values.isNotEmpty()) {
-                                data.add(normalizeFeatureCount(values, expectedFeatures))
+                            if (values.isNotEmpty()) {
+                                // FIXED: Accept rows even if feature count differs
+                                if (actualFeatureCount > 0) {
+                                    if (values.size == actualFeatureCount) {
+                                        data.add(values)
+                                    } else {
+                                        data.add(normalizeFeatureCount(values, actualFeatureCount))
+                                    }
+                                } else {
+                                    // No expected count, accept as-is
+                                    data.add(values)
+                                }
                             }
                         } catch (e: Exception) {
                             Timber.w("Skipping invalid row: ${e.message}")
@@ -545,13 +757,22 @@ class DataFileParser(private val context: Context) {
             Timber.e(e, "Failed to parse $formatName file")
         }
 
-        return data
+        // Ensure column names match data dimensions
+        if (data.isNotEmpty() && columnNames.size != data.first().size) {
+            val actualSize = data.first().size
+            Timber.w("⚠️ Column name count (${columnNames.size}) doesn't match data dimensions ($actualSize), regenerating")
+            columnNames = List(actualSize) { i ->
+                if (i < columnNames.size) columnNames[i] else "feature_$i"
+            }
+        }
+
+        return ParsedData(data, columnNames, hasHeader)
     }
 
     /**
      * Parse text file with auto-detection
      */
-    private fun parseTextFile(uri: Uri, expectedFeatures: Int): List<FloatArray> {
+    private fun parseTextFile(uri: Uri, expectedFeatures: Int): ParsedData {
         // Try to detect delimiter
         try {
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -576,13 +797,13 @@ class DataFileParser(private val context: Context) {
             Timber.e(e, "Failed to auto-detect format")
         }
 
-        return emptyList()
+        return ParsedData(emptyList(), emptyList(), false)
     }
 
     /**
      * Auto-detect file format and parse
      */
-    private fun parseAutoDetect(uri: Uri, expectedFeatures: Int): List<FloatArray> {
+    private fun parseAutoDetect(uri: Uri, expectedFeatures: Int): ParsedData {
         Timber.d("🔍 Auto-detecting file format...")
 
         return try {
@@ -614,10 +835,10 @@ class DataFileParser(private val context: Context) {
                         parseCSV(uri, expectedFeatures)
                     }
                 }
-            } ?: emptyList()
+            } ?: ParsedData(emptyList(), emptyList(), false)
         } catch (e: Exception) {
             Timber.e(e, "Auto-detection failed")
-            emptyList()
+            ParsedData(emptyList(), emptyList(), false)
         }
     }
 
@@ -637,15 +858,39 @@ class DataFileParser(private val context: Context) {
      * Parse numeric value handling different formats
      */
     private fun parseNumeric(value: String): Float {
+        if (value.isBlank()) {
+            throw NumberFormatException("Empty or blank value")
+        }
+
         return try {
-            val cleaned = value.replace(Regex("[^0-9.\\-eE+]"), "")
+            // Remove common non-numeric characters but keep valid numeric parts
+            val cleaned = value.trim()
+                .replace(Regex("[$,%]"), "") // Remove currency symbols and percent
+                .replace(Regex("\\s+"), "") // Remove all whitespace
+                .trim()
+
             when {
-                cleaned.isEmpty() -> 0f
-                cleaned == "-" -> 0f
-                else -> cleaned.toFloat()
+                cleaned.isEmpty() -> throw NumberFormatException("Empty after cleaning")
+                cleaned.equals(
+                    "null",
+                    ignoreCase = true
+                ) -> throw NumberFormatException("Null value")
+
+                cleaned.equals("na", ignoreCase = true) -> throw NumberFormatException("NA value")
+                cleaned.equals("nan", ignoreCase = true) -> throw NumberFormatException("NaN value")
+                cleaned == "-" -> throw NumberFormatException("Invalid minus sign")
+                else -> {
+                    val parsed = cleaned.toFloat()
+                    // Validate the parsed value
+                    if (parsed.isNaN() || parsed.isInfinite()) {
+                        throw NumberFormatException("NaN or Infinite value")
+                    }
+                    parsed
+                }
             }
-        } catch (e: Exception) {
-            0f
+        } catch (e: NumberFormatException) {
+            // Re-throw with original value for better error messages
+            throw NumberFormatException("Cannot parse '$value' as numeric: ${e.message}")
         }
     }
 

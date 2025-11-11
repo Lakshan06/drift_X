@@ -39,6 +39,8 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun ModelUploadScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToDashboard: () -> Unit = {},
+    onNavigateToPatches: () -> Unit = {},
     viewModel: ModelUploadViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -144,11 +146,16 @@ fun ModelUploadScreen(
                         ProcessingResultsCard(
                             model = model,
                             driftResult = driftResult,
-                            patch = uiState.synthesizedPatch
+                            patch = uiState.synthesizedPatch,
+                            onNavigateToDashboard = onNavigateToDashboard,
+                            onNavigateToPatches = onNavigateToPatches
                         )
                     } else {
                         // Show model registration success card
-                        ModelRegisteredCard(model = model)
+                        ModelRegisteredCard(
+                            model = model,
+                            onNavigateToDashboard = onNavigateToDashboard
+                        )
                     }
                 }
             }
@@ -461,7 +468,8 @@ fun LocalFileUploadSection(
 
                     Text(
                         "1. Click the button below to open file picker",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         "2. Select your model file (e.g., model.tflite)",
@@ -469,13 +477,12 @@ fun LocalFileUploadSection(
                     )
                     Text(
                         "3. Hold Ctrl/Cmd and click your data file (e.g., data.csv)",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
+                        style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
                         "4. Click 'Open' to upload both files together",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -1209,7 +1216,9 @@ fun MessageCard(
 fun ProcessingResultsCard(
     model: MLModel,
     driftResult: DriftResult,
-    patch: Patch?
+    patch: Patch?,
+    onNavigateToDashboard: () -> Unit,
+    onNavigateToPatches: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1327,7 +1336,7 @@ fun ProcessingResultsCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedButton(
-                        onClick = { /* Navigate to dashboard */ },
+                        onClick = onNavigateToDashboard,
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.Default.Dashboard, contentDescription = "View dashboard")
@@ -1337,7 +1346,7 @@ fun ProcessingResultsCard(
                     
                     if (patch != null) {
                         Button(
-                            onClick = { /* Navigate to patches */ },
+                            onClick = onNavigateToPatches,
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Default.Build, contentDescription = "View patches")
@@ -1352,7 +1361,10 @@ fun ProcessingResultsCard(
 }
 
 @Composable
-fun ModelRegisteredCard(model: MLModel) {
+fun ModelRegisteredCard(
+    model: MLModel,
+    onNavigateToDashboard: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -1466,7 +1478,7 @@ fun ModelRegisteredCard(model: MLModel) {
             
             // Action Button
             Button(
-                onClick = { /* Will be handled by navigation */ },
+                onClick = onNavigateToDashboard,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.Dashboard, contentDescription = "Go to dashboard")
@@ -1500,5 +1512,3 @@ fun ResultRow(
         )
     }
 }
-
-

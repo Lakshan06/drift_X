@@ -650,7 +650,7 @@ val viewModelModule = module {
     viewModel {
         try {
             Log.d("KOIN", "Creating AIAssistantViewModel...")
-            AIAssistantViewModel(get())
+            AIAssistantViewModel(get(), get())
         } catch (e: Exception) {
             Log.e("KOIN", "✗ AIAssistantViewModel creation FAILED", e)
             throw e

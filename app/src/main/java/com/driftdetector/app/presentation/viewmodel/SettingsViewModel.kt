@@ -27,6 +27,9 @@ import java.util.Locale
 import org.json.JSONObject
 import org.json.JSONArray
 import android.net.Uri
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 /**
  * ViewModel for settings screen
@@ -42,9 +45,12 @@ class SettingsViewModel(
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
+    var showBackendConnectionInfoDialog by mutableStateOf(false)
+
     init {
         loadSettings()
         calculateStorageUsed()
+        checkBackendConnection()
     }
 
     private fun loadSettings() {
@@ -791,6 +797,67 @@ class SettingsViewModel(
         }
     }
 
+    // Backend Connection Methods
+    private fun checkBackendConnection() {
+        viewModelScope.launch {
+            try {
+                val prefs = encryptionManager.encryptedPreferences
+                val serverUrl = prefs.getString("backend_server_url", null)
+
+                if (serverUrl.isNullOrEmpty()) {
+                    _uiState.update {
+                        it.copy(
+                            backendConnectionStatus = BackendConnectionStatus.DISCONNECTED,
+                            backendServerUrl = null
+                        )
+                    }
+                    Timber.d("🔴 Backend: Not configured")
+                    return@launch
+                }
+
+                // TODO: Actually ping the backend server
+                // For now, simulate connection status
+                val isConnected = false // Replace with actual connection check
+
+                _uiState.update {
+                    it.copy(
+                        backendConnectionStatus = if (isConnected)
+                            BackendConnectionStatus.CONNECTED
+                        else
+                            BackendConnectionStatus.READY,
+                        backendServerUrl = serverUrl
+                    )
+                }
+
+                Timber.d(
+                    if (isConnected) "🟢 Backend: Connected to $serverUrl"
+                    else "🟡 Backend: Ready (configured but not connected) - $serverUrl"
+                )
+
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to check backend connection")
+                _uiState.update {
+                    it.copy(
+                        backendConnectionStatus = BackendConnectionStatus.DISCONNECTED,
+                        backendServerUrl = null
+                    )
+                }
+            }
+        }
+    }
+
+    fun showBackendConnectionInfoDialog() {
+        showBackendConnectionInfoDialog = true
+    }
+
+    fun hideBackendConnectionInfoDialog() {
+        showBackendConnectionInfoDialog = false
+    }
+
+    fun refreshBackendConnection() {
+        checkBackendConnection()
+    }
+
 }
 
 /**
@@ -843,6 +910,10 @@ data class SettingsUiState(
     val lastExportedFiles: List<String> = emptyList(),
     val lastExportPath: String = "",
 
+    // Backend Connection
+    val backendConnectionStatus: BackendConnectionStatus = BackendConnectionStatus.DISCONNECTED,
+    val backendServerUrl: String? = null,
+
     // About
     val appVersion: String = "1.0.0",
     val storageUsed: String = "Calculating..."
@@ -869,4 +940,10 @@ enum class ExportLocation(val displayName: String) {
     INTERNAL("Internal Storage (App Data)"),
     DOWNLOADS("Downloads Folder"),
     CUSTOM("Custom Location")
+}
+
+enum class BackendConnectionStatus {
+    DISCONNECTED,
+    READY,
+    CONNECTED
 }

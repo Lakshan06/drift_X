@@ -184,7 +184,8 @@ class DriftDashboardViewModel(
                 }
 
                 if (patchResult.isFailure) {
-                    val error = patchResult.exceptionOrNull()!!
+                    val error =
+                        patchResult.exceptionOrNull() ?: Exception("Patch generation failed")
                     Timber.e(error, "Failed to generate patches")
                     errorHandler.handleError(error)
                     _patchGenerationState.value =

@@ -10,6 +10,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -40,7 +41,8 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun DriftDashboardScreen(
     viewModel: DriftDashboardViewModel = koinViewModel(),
-    onNavigateToInstantDriftFix: () -> Unit = {}
+    onNavigateToInstantDriftFix: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val patchGenerationState by viewModel.patchGenerationState.collectAsState()
@@ -93,7 +95,7 @@ fun DriftDashboardScreen(
                     IconButton(onClick = { viewModel.refresh() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                     }
-                    IconButton(onClick = { /* Settings */ }) {
+                    IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 }
@@ -394,6 +396,7 @@ fun AlertsTab(state: DriftDashboardState.Success) {
     val criticalDrifts = state.driftResults.filter { it.isDriftDetected && it.driftScore > 0.5 }
     val warningDrifts =
         state.driftResults.filter { it.isDriftDetected && it.driftScore in 0.2..0.5 }
+    var selectedAlertForDetails by remember { mutableStateOf<DriftResult?>(null) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -421,7 +424,11 @@ fun AlertsTab(state: DriftDashboardState.Success) {
             }
 
             items(criticalDrifts) { drift ->
-                AlertCard(drift, AlertLevel.CRITICAL)
+                AlertCard(
+                    driftResult = drift,
+                    level = AlertLevel.CRITICAL,
+                    onViewDetails = { selectedAlertForDetails = drift }
+                )
             }
         }
 
@@ -438,9 +445,21 @@ fun AlertsTab(state: DriftDashboardState.Success) {
             }
 
             items(warningDrifts) { drift ->
-                AlertCard(drift, AlertLevel.WARNING)
+                AlertCard(
+                    driftResult = drift,
+                    level = AlertLevel.WARNING,
+                    onViewDetails = { selectedAlertForDetails = drift }
+                )
             }
         }
+    }
+
+    // Alert Details Dialog
+    if (selectedAlertForDetails != null) {
+        AlertDetailsDialog(
+            driftResult = selectedAlertForDetails!!,
+            onDismiss = { selectedAlertForDetails = null }
+        )
     }
 }
 
@@ -519,10 +538,15 @@ fun PulsingEffect(
 
 @Composable
 fun MetricsSummaryCard(state: DriftDashboardState.Success) {
+    val isDark = isSystemInDarkTheme()
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp
         )
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
@@ -542,7 +566,10 @@ fun MetricsSummaryCard(state: DriftDashboardState.Success) {
                         text = "Model Performance Overview",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.95f)
+                        color = if (isDark)
+                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.95f)
+                        else
+                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
                     )
                 }
 
@@ -608,6 +635,15 @@ fun MetricBox(
     tooltip: String? = null
 ) {
     var showTooltip by remember { mutableStateOf(false) }
+    val isDark = isSystemInDarkTheme()
+
+    val iconBackgroundAlpha = if (isDark) 0.35f else 0.20f
+    val iconTint = if (isDark) color.copy(alpha = 0.80f) else color
+    val labelTextColor =
+        if (isDark) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
+    val infoIconAlpha = if (isDark) 0.9f else 0.7f
+    val tooltipSurfaceColor =
+        if (isDark) MaterialTheme.colorScheme.surface.copy(alpha = 0.98f) else MaterialTheme.colorScheme.surface
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -629,14 +665,14 @@ fun MetricBox(
                 modifier = mod
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(color.copy(alpha = 0.3f)),
+                    .background(color.copy(alpha = iconBackgroundAlpha)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = "$label metric",
-                    tint = color,
-                    modifier = Modifier.size(26.dp)
+                    tint = iconTint,
+                    modifier = Modifier.size(28.dp)
                 )
             }
         }
@@ -648,7 +684,7 @@ fun MetricBox(
             AnimatedCounter(
                 count = numberValue,
                 style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = labelTextColor,
                 modifier = Modifier
             )
         } else {
@@ -659,14 +695,14 @@ fun MetricBox(
                     number = floatValue,
                     decimals = 3,
                     style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = labelTextColor
                 )
             } else {
                 Text(
                     text = value,
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = labelTextColor
                 )
             }
         }
@@ -676,7 +712,7 @@ fun MetricBox(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                color = labelTextColor
             )
             if (tooltip != null) {
                 Spacer(modifier = Modifier.width(4.dp))
@@ -684,7 +720,7 @@ fun MetricBox(
                     Icons.Default.Info,
                     contentDescription = "Tap for details",
                     modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    tint = labelTextColor.copy(alpha = infoIconAlpha)
                 )
             }
         }
@@ -693,7 +729,7 @@ fun MetricBox(
         if (showTooltip && tooltip != null) {
             Spacer(modifier = Modifier.height(8.dp))
             Surface(
-                color = MaterialTheme.colorScheme.surface,
+                color = tooltipSurfaceColor,
                 shape = MaterialTheme.shapes.medium,
                 tonalElevation = 8.dp,
                 shadowElevation = 8.dp,
@@ -766,6 +802,8 @@ fun MetricBox(
 
 @Composable
 fun DriftStatusGaugeCard(driftResult: DriftResult) {
+    val isDark = isSystemInDarkTheme()
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -803,7 +841,7 @@ fun DriftStatusGaugeCard(driftResult: DriftResult) {
             // Visual Drift Level Badge with better contrast
             Surface(
                 shape = MaterialTheme.shapes.medium,
-                color = driftColor.copy(alpha = 0.15f),
+                color = driftColor.copy(alpha = if (isDark) 0.25f else 0.15f),
                 modifier = Modifier.padding(8.dp)
             ) {
                 Column(
@@ -847,7 +885,10 @@ fun DriftStatusGaugeCard(driftResult: DriftResult) {
                         Icon(
                             Icons.Default.Info,
                             contentDescription = "Drift explanation",
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = if (isDark)
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                            else
+                                MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(22.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -1404,12 +1445,15 @@ fun AlertMetric(
     label: String,
     color: Color
 ) {
+    val isDark = isSystemInDarkTheme()
+    val iconBackgroundAlpha = if (isDark) 0.35f else 0.25f
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
                 .size(60.dp)
                 .clip(CircleShape)
-                .background(color.copy(alpha = 0.25f)),
+                .background(color.copy(alpha = iconBackgroundAlpha)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -1436,18 +1480,23 @@ fun AlertMetric(
 }
 
 @Composable
-fun AlertCard(driftResult: DriftResult, level: AlertLevel) {
+fun AlertCard(
+    driftResult: DriftResult,
+    level: AlertLevel,
+    onViewDetails: () -> Unit
+) {
     val dateFormatter = DateTimeFormatter.ofPattern("MMM dd, HH:mm:ss")
     val formattedDate = driftResult.timestamp.atZone(ZoneId.systemDefault()).format(dateFormatter)
     val viewModel: DriftDashboardViewModel = koinViewModel()
+    val isDark = isSystemInDarkTheme()
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = when (level) {
-                AlertLevel.CRITICAL -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-                AlertLevel.WARNING -> Color(0xFFFF9800).copy(alpha = 0.12f)
-                AlertLevel.INFO -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                AlertLevel.CRITICAL -> MaterialTheme.colorScheme.errorContainer.copy(alpha = if (isDark) 0.40f else 0.3f)
+                AlertLevel.WARNING -> Color(0xFFFF9800).copy(alpha = if (isDark) 0.20f else 0.12f)
+                AlertLevel.INFO -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isDark) 0.60f else 0.5f)
             }
         )
     ) {
@@ -1549,7 +1598,7 @@ fun AlertCard(driftResult: DriftResult, level: AlertLevel) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                TextButton(onClick = { /* View Details */ }) {
+                TextButton(onClick = onViewDetails) {
                     Text(
                         "View Details",
                         style = MaterialTheme.typography.bodyLarge,
@@ -1574,6 +1623,331 @@ fun AlertCard(driftResult: DriftResult, level: AlertLevel) {
                         fontWeight = FontWeight.Bold
                     )
                 }
+            }
+        }
+    }
+}
+
+// ========== Alert Details Dialog ==========
+
+@Composable
+fun AlertDetailsDialog(
+    driftResult: DriftResult,
+    onDismiss: () -> Unit
+) {
+    val dateFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm:ss")
+    val formattedDate = driftResult.timestamp.atZone(ZoneId.systemDefault()).format(dateFormatter)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = when {
+                    driftResult.driftScore > 0.5 -> Icons.Default.Error
+                    driftResult.driftScore > 0.2 -> Icons.Default.Warning
+                    else -> Icons.Default.Info
+                },
+                contentDescription = "Alert details",
+                tint = when {
+                    driftResult.driftScore > 0.5 -> MaterialTheme.colorScheme.error
+                    driftResult.driftScore > 0.2 -> Color(0xFFFF9800)
+                    else -> MaterialTheme.colorScheme.primary
+                },
+                modifier = Modifier.size(48.dp)
+            )
+        },
+        title = {
+            Text(
+                "Alert Details",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Drift Summary Card
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            DetailRow("Drift Type", driftResult.driftType.name.replace("_", " "))
+                            DetailRow("Drift Score", String.format("%.4f", driftResult.driftScore))
+                            DetailRow("Detected At", formattedDate)
+                            DetailRow(
+                                "Severity",
+                                when {
+                                    driftResult.driftScore > 0.7 -> "🔴 HIGH"
+                                    driftResult.driftScore > 0.4 -> "🟠 MODERATE"
+                                    driftResult.driftScore > 0.15 -> "🟡 LOW"
+                                    else -> "🟢 MINIMAL"
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // Feature Drifts Section
+                item {
+                    HorizontalDivider()
+                    Text(
+                        "📊 Feature-Level Drift Analysis",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                items(driftResult.featureDrifts.sortedByDescending { it.driftScore }) { feature ->
+                    FeatureDriftDetailCard(feature)
+                }
+
+                // Statistical Tests Section
+                if (driftResult.statisticalTests.isNotEmpty()) {
+                    item {
+                        HorizontalDivider()
+                        Text(
+                            "📈 Statistical Tests",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    items(driftResult.statisticalTests) { test ->
+                        StatisticalTestDetailCard(test)
+                    }
+                }
+
+                // Recommendations Section
+                item {
+                    HorizontalDivider()
+                    Text(
+                        "💡 Recommended Actions",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            val recommendations = when {
+                                driftResult.driftScore > 0.5 -> listOf(
+                                    "🔧 Apply auto-generated patch immediately",
+                                    "📊 Schedule model retraining within 1-2 weeks",
+                                    "⏰ Increase monitoring frequency to hourly",
+                                    "✅ Run validation suite to quantify degradation"
+                                )
+
+                                driftResult.driftScore > 0.2 -> listOf(
+                                    "🔍 Review and apply suggested patches",
+                                    "📈 Collect more samples for retraining",
+                                    "🔎 Investigate why top features are drifting",
+                                    "📅 Plan retraining within 1-2 months if drift persists"
+                                )
+
+                                else -> listOf(
+                                    "👀 Continue current monitoring schedule",
+                                    "📝 Document this pattern for trend analysis",
+                                    "🔧 Consider applying light patches if available",
+                                    "⏱️ Review again in 1-2 weeks"
+                                )
+                            }
+
+                            recommendations.forEach { recommendation ->
+                                Row(
+                                    verticalAlignment = Alignment.Top,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = recommendation,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("Close")
+            }
+        },
+        dismissButton = {
+            val viewModel: DriftDashboardViewModel = koinViewModel()
+            OutlinedButton(onClick = {
+                viewModel.generatePatch(driftResult)
+                onDismiss()
+            }) {
+                Icon(
+                    Icons.Default.Build,
+                    contentDescription = "Generate patch",
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Generate Patch")
+            }
+        }
+    )
+}
+
+@Composable
+fun DetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+    }
+}
+
+@Composable
+fun FeatureDriftDetailCard(feature: FeatureDrift) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = feature.featureName,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = when {
+                        feature.driftScore > 0.5 -> MaterialTheme.colorScheme.error
+                        feature.driftScore > 0.2 -> Color(0xFFFF9800)
+                        else -> MaterialTheme.colorScheme.primary
+                    }
+                ) {
+                    Text(
+                        text = String.format("%.4f", feature.driftScore),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+
+            LinearProgressIndicator(
+                progress = (feature.driftScore.toFloat().coerceIn(0f, 1f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(MaterialTheme.shapes.small),
+                color = when {
+                    feature.driftScore > 0.5 -> MaterialTheme.colorScheme.error
+                    feature.driftScore > 0.2 -> Color(0xFFFF9800)
+                    else -> MaterialTheme.colorScheme.primary
+                }
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Attribution: ${String.format("%.3f", feature.attribution)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "PSI: ${feature.psiScore?.let { String.format("%.3f", it) } ?: "N/A"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun StatisticalTestDetailCard(test: com.driftdetector.app.domain.model.StatisticalTestResult) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (test.isPassed)
+                MaterialTheme.colorScheme.surfaceVariant
+            else
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (test.isPassed) Icons.Default.CheckCircle else Icons.Default.Error,
+                        contentDescription = if (test.isPassed) "Test passed" else "Test failed",
+                        tint = if (test.isPassed) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = test.testName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Statistic: ${String.format("%.4f", test.statistic)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "p-value: ${String.format("%.4f", test.pValue)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

@@ -299,6 +299,15 @@ fun DriftDetectorApp() {
                 DriftDashboardScreen(
                     onNavigateToInstantDriftFix = {
                         navController.navigate(Screen.InstantDriftFix.route)
+                    },
+                    onNavigateToSettings = {
+                        navController.navigate(Screen.Settings.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
                 )
             }
@@ -316,6 +325,24 @@ fun DriftDetectorApp() {
                 ModelUploadScreen(
                     onNavigateBack = {
                         navController.popBackStack()
+                    },
+                    onNavigateToDashboard = {
+                        navController.navigate(Screen.Dashboard.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onNavigateToPatches = {
+                        navController.navigate(Screen.Patches.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
                 )
             }

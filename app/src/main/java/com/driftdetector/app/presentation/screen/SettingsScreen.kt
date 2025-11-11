@@ -3,6 +3,7 @@ package com.driftdetector.app.presentation.screen
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Backup
@@ -10,6 +11,7 @@ import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.BuildCircle
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteForever
@@ -25,9 +27,9 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SmartToy
-import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.TrendingUp
@@ -36,6 +38,7 @@ import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -45,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import com.driftdetector.app.presentation.viewmodel.ExportLocation
 import com.driftdetector.app.presentation.viewmodel.ModelExportInfo
 import com.driftdetector.app.presentation.viewmodel.SettingsViewModel
+import com.driftdetector.app.presentation.viewmodel.BackendConnectionStatus
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -52,6 +56,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showPrivacyPolicyDialog by remember { mutableStateOf(false) }
 
     // Show export model selection dialog
     if (uiState.showExportDialog) {
@@ -89,6 +94,58 @@ fun SettingsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Backend Connection
+        item {
+            SettingsSection(title = "Backend Connection") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Cloud,
+                            contentDescription = "Backend connection status",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(26.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "Backend Connection",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                text = when (uiState.backendConnectionStatus) {
+                                    BackendConnectionStatus.CONNECTED -> "Connected"
+                                    BackendConnectionStatus.READY -> "Ready"
+                                    BackendConnectionStatus.DISCONNECTED -> "Disconnected"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = when (uiState.backendConnectionStatus) {
+                                    BackendConnectionStatus.CONNECTED -> MaterialTheme.colorScheme.primary
+                                    BackendConnectionStatus.READY -> MaterialTheme.colorScheme.secondary
+                                    BackendConnectionStatus.DISCONNECTED -> MaterialTheme.colorScheme.error
+                                }
+                            )
+                        }
+                    }
+                    IconButton(onClick = { viewModel.showBackendConnectionInfoDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Backend connection info",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
         // Theme Settings
         item {
             SettingsSection(title = "Appearance") {
@@ -321,10 +378,24 @@ fun SettingsScreen(
                     icon = Icons.Default.PrivacyTip,
                     title = "Privacy Policy",
                     subtitle = "View privacy policy",
-                    onClick = { /* TODO: Open privacy policy */ }
+                    onClick = { showPrivacyPolicyDialog = true }
                 )
             }
         }
+    }
+
+    if (viewModel.showBackendConnectionInfoDialog) {
+        BackendConnectionInfoDialog(
+            connectionStatus = uiState.backendConnectionStatus,
+            serverUrl = uiState.backendServerUrl ?: "Not configured",
+            onDismiss = { viewModel.hideBackendConnectionInfoDialog() }
+        )
+    }
+
+    if (showPrivacyPolicyDialog) {
+        PrivacyPolicyDialog(
+            onDismiss = { showPrivacyPolicyDialog = false }
+        )
     }
 }
 
@@ -877,4 +948,465 @@ fun ExportErrorDialog(
             }
         }
     )
+}
+
+@Composable
+fun BackendConnectionInfoDialog(
+    connectionStatus: BackendConnectionStatus,
+    serverUrl: String,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = when (connectionStatus) {
+                    BackendConnectionStatus.CONNECTED -> Icons.Default.CloudDone
+                    BackendConnectionStatus.READY -> Icons.Default.Cloud
+                    BackendConnectionStatus.DISCONNECTED -> Icons.Default.CloudOff
+                },
+                contentDescription = "Connection status",
+                tint = when (connectionStatus) {
+                    BackendConnectionStatus.CONNECTED -> androidx.compose.ui.graphics.Color(
+                        0xFF4CAF50
+                    ) // Green
+                    BackendConnectionStatus.READY -> androidx.compose.ui.graphics.Color(0xFFFFC107) // Yellow/Amber
+                    BackendConnectionStatus.DISCONNECTED -> androidx.compose.ui.graphics.Color(
+                        0xFFF44336
+                    ) // Red
+                },
+                modifier = Modifier.size(48.dp)
+            )
+        },
+        title = {
+            Text(
+                "Backend Server Connection",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    // Current Status
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = when (connectionStatus) {
+                                BackendConnectionStatus.CONNECTED -> androidx.compose.ui.graphics.Color(
+                                    0xFF4CAF50
+                                ).copy(alpha = 0.1f)
+
+                                BackendConnectionStatus.READY -> androidx.compose.ui.graphics.Color(
+                                    0xFFFFC107
+                                ).copy(alpha = 0.1f)
+
+                                BackendConnectionStatus.DISCONNECTED -> androidx.compose.ui.graphics.Color(
+                                    0xFFF44336
+                                ).copy(alpha = 0.1f)
+                            }
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                "📊 Current Status:",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    modifier = Modifier.size(16.dp),
+                                    shape = CircleShape,
+                                    color = when (connectionStatus) {
+                                        BackendConnectionStatus.CONNECTED -> androidx.compose.ui.graphics.Color(
+                                            0xFF4CAF50
+                                        )
+
+                                        BackendConnectionStatus.READY -> androidx.compose.ui.graphics.Color(
+                                            0xFFFFC107
+                                        )
+
+                                        BackendConnectionStatus.DISCONNECTED -> androidx.compose.ui.graphics.Color(
+                                            0xFFF44336
+                                        )
+                                    }
+                                ) {}
+                                Text(
+                                    when (connectionStatus) {
+                                        BackendConnectionStatus.CONNECTED -> "🟢 Connected - Backend is online"
+                                        BackendConnectionStatus.READY -> "🟡 Ready - Backend configured, awaiting connection"
+                                        BackendConnectionStatus.DISCONNECTED -> "🔴 Disconnected - No backend connection"
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            if (serverUrl != "Not configured") {
+                                Text(
+                                    "Server: $serverUrl",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    HorizontalDivider()
+                }
+
+                item {
+                    Text(
+                        "📖 How to Connect Backend Server:",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                item {
+                    InstructionStep(
+                        number = "1",
+                        title = "Set Up Backend Server",
+                        description = "Deploy the DriftGuard backend server using Docker or cloud platform (AWS, Azure, GCP)."
+                    )
+                }
+
+                item {
+                    InstructionStep(
+                        number = "2",
+                        title = "Get Server URL",
+                        description = "Obtain your backend server URL (e.g., https://api.driftguard.example.com or ws://192.168.1.100:8080)."
+                    )
+                }
+
+                item {
+                    InstructionStep(
+                        number = "3",
+                        title = "Configure in AppModule.kt",
+                        description = "Update the server URL in di/AppModule.kt:\n\nval serverUrl = \"YOUR_SERVER_URL\"\n\nRecompile the app to apply changes."
+                    )
+                }
+
+                item {
+                    InstructionStep(
+                        number = "4",
+                        title = "Verify Connection",
+                        description = "Restart the app. The status indicator will turn yellow (Ready) or green (Connected) when the backend is reachable."
+                    )
+                }
+
+                item {
+                    HorizontalDivider()
+                }
+
+                item {
+                    Text(
+                        "🎨 Status Indicators:",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                item {
+                    StatusExplanationItem(
+                        color = androidx.compose.ui.graphics.Color(0xFF4CAF50),
+                        status = "🟢 Connected (Green)",
+                        description = "Backend server is online and actively connected. Real-time monitoring and cloud sync are active."
+                    )
+                }
+
+                item {
+                    StatusExplanationItem(
+                        color = androidx.compose.ui.graphics.Color(0xFFFFC107),
+                        status = "🟡 Ready (Yellow)",
+                        description = "Backend is configured and ready. App is attempting to connect or connection is in progress."
+                    )
+                }
+
+                item {
+                    StatusExplanationItem(
+                        color = androidx.compose.ui.graphics.Color(0xFFF44336),
+                        status = "🔴 Disconnected (Red)",
+                        description = "No backend connection. App works offline with local monitoring only. Cloud features disabled."
+                    )
+                }
+
+                item {
+                    HorizontalDivider()
+                }
+
+                item {
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                "💡 Note:",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Text(
+                                "The app works fully offline. Backend connection is optional and enables cloud sync, collaborative monitoring, and remote model management.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("Got It")
+            }
+        }
+    )
+}
+
+@Composable
+fun InstructionStep(
+    number: String,
+    title: String,
+    description: String
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Surface(
+            modifier = Modifier.size(28.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    number,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            }
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+fun StatusExplanationItem(
+    color: androidx.compose.ui.graphics.Color,
+    status: String,
+    description: String
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Surface(
+            modifier = Modifier.size(16.dp),
+            shape = CircleShape,
+            color = color
+        ) {}
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                status,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+fun PrivacyPolicyDialog(
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.PrivacyTip,
+                contentDescription = "Privacy Policy",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(48.dp)
+            )
+        },
+        title = {
+            Text(
+                "Privacy Policy",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Text(
+                        "Your Privacy is Our Priority",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                item {
+                    Text(
+                        "DriftGuardAI is designed with privacy-first principles:",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                item {
+                    PrivacyPolicySection(
+                        icon = Icons.Default.Lock,
+                        title = "Local-First Storage",
+                        description = "All your ML models, data, and drift analysis results are stored locally on your device. We never upload your models or sensitive data to our servers."
+                    )
+                }
+
+                item {
+                    PrivacyPolicySection(
+                        icon = Icons.Default.Security,
+                        title = "End-to-End Encryption",
+                        description = "Your data is encrypted at rest using Android's secure encryption APIs. Database encryption is enabled by default and cannot be disabled."
+                    )
+                }
+
+                item {
+                    PrivacyPolicySection(
+                        icon = Icons.Default.Cloud,
+                        title = "Optional Cloud Sync",
+                        description = "Cloud sync is optional and disabled by default. If enabled, only metadata (model names, drift scores) is synced. Your actual models and datasets always stay on your device."
+                    )
+                }
+
+                item {
+                    PrivacyPolicySection(
+                        icon = Icons.Default.Visibility,
+                        title = "No Analytics or Tracking",
+                        description = "We don't collect analytics, crash reports, or track your usage. This app works completely offline and doesn't require an internet connection."
+                    )
+                }
+
+                item {
+                    PrivacyPolicySection(
+                        icon = Icons.Default.Storage,
+                        title = "Data Ownership",
+                        description = "You own all your data. Export it anytime, delete it anytime. No vendor lock-in, no data retention policies."
+                    )
+                }
+
+                item {
+                    PrivacyPolicySection(
+                        icon = Icons.Default.Info,
+                        title = "Open Source",
+                        description = "DriftGuardAI is open source. You can review the code, verify our privacy claims, and contribute improvements."
+                    )
+                }
+
+                item {
+                    HorizontalDivider()
+                }
+
+                item {
+                    Text(
+                        "📧 Contact",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "For privacy questions or concerns, please contact us at: privacy@driftguardai.com",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                item {
+                    Text(
+                        "Last Updated: November 2025",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("Got It")
+            }
+        }
+    )
+}
+
+@Composable
+fun PrivacyPolicySection(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    description: String
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
 }

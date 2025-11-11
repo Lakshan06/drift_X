@@ -138,12 +138,22 @@ class InstantDriftFixViewModel(
                 )
 
                 if (result.success && result.driftResult != null) {
+                    // FIXED: Safe null handling
+                    val modelInfo = result.modelInfo
+                    if (modelInfo == null) {
+                        _uiState.value =
+                            InstantDriftFixState.Error("Model information not available")
+                        Timber.e("❌ Model info is null in analysis result")
+                        return@launch
+                    }
+
                     _uiState.value = InstantDriftFixState.AnalysisComplete(
-                        modelInfo = result.modelInfo!!,
+                        modelInfo = modelInfo,
                         driftResult = result.driftResult,
-                        patchCandidates = result.patches
+                        patchCandidates = result.patches,
+                        columnNames = result.columnNames
                     )
-                    Timber.i("✅ Analysis complete: ${result.patches.size} patches available")
+                    Timber.i(" Analysis complete: ${result.patches.size} patches available")
                 } else {
                     _uiState.value = InstantDriftFixState.Error(
                         result.error ?: "Analysis failed"
@@ -207,7 +217,8 @@ class InstantDriftFixViewModel(
                     dataUri = data,
                     dataFileName = dataName,
                     selectedPatches = selectedPatches,
-                    driftResult = analysisState.driftResult
+                    driftResult = analysisState.driftResult,
+                    columnNames = analysisState.columnNames
                 )
 
                 if (result.success && result.patchedModelFile != null && result.patchedDataFile != null) {
@@ -302,7 +313,8 @@ sealed class InstantDriftFixState {
     data class AnalysisComplete(
         val modelInfo: ModelInfo,
         val driftResult: DriftResult,
-        val patchCandidates: List<PatchCandidate>
+        val patchCandidates: List<PatchCandidate>,
+        val columnNames: List<String> = emptyList()
     ) : InstantDriftFixState()
 
     /**

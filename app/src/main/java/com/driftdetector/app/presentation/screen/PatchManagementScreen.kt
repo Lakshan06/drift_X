@@ -368,6 +368,19 @@ fun PatchListContent(
     onRollbackPatch: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Split patches into categories for better UX
+    val validatedPatches = state.patches.filter {
+        it.status == PatchStatus.VALIDATED || it.status == PatchStatus.APPLIED
+    }
+    val createdPatches = state.patches.filter {
+        it.status == PatchStatus.CREATED
+    }
+    val otherPatches = state.patches.filter {
+        it.status != PatchStatus.VALIDATED &&
+                it.status != PatchStatus.APPLIED &&
+                it.status != PatchStatus.CREATED
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -442,28 +455,197 @@ fun PatchListContent(
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                "All Patches (${state.patches.size})",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                "Patches are applied in order. Roll back anytime to restore original model behavior.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        // ========== VALIDATED PATCHES SECTION ==========
+        if (validatedPatches.isNotEmpty()) {
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = "Validated patches",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "✅ Validated Patches (${validatedPatches.size})",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                "Ready to apply • Tested and safe",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+
+            items(validatedPatches) { patch ->
+                EnhancedPatchCard(
+                    patch = patch,
+                    onApply = { onApplyPatch(patch.id) },
+                    onRollback = { onRollbackPatch(patch.id) },
+                    isProcessing = state.isProcessing && state.processingPatchId == patch.id,
+                    viewModel = viewModel
+                )
+            }
         }
 
-        items(state.patches) { patch ->
-            EnhancedPatchCard(
-                patch = patch,
-                onApply = { onApplyPatch(patch.id) },
-                onRollback = { onRollbackPatch(patch.id) },
-                isProcessing = state.isProcessing && state.processingPatchId == patch.id,
-                viewModel = viewModel
-            )
+        // ========== CREATED PATCHES SECTION ==========
+        if (createdPatches.isNotEmpty()) {
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Pending,
+                            contentDescription = "Created patches",
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "⏳ Created Patches (${createdPatches.size})",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.tertiary
+                            )
+                            Text(
+                                "Pending validation • Will be validated automatically",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+
+            items(createdPatches) { patch ->
+                EnhancedPatchCard(
+                    patch = patch,
+                    onApply = { onApplyPatch(patch.id) },
+                    onRollback = { onRollbackPatch(patch.id) },
+                    isProcessing = state.isProcessing && state.processingPatchId == patch.id,
+                    viewModel = viewModel
+                )
+            }
+        }
+
+        // ========== OTHER PATCHES SECTION (Failed, Rolled Back) ==========
+        if (otherPatches.isNotEmpty()) {
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = "Other patches",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "📋 Other Patches (${otherPatches.size})",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                "Failed, rolled back, or in other states",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            items(otherPatches) { patch ->
+                EnhancedPatchCard(
+                    patch = patch,
+                    onApply = { onApplyPatch(patch.id) },
+                    onRollback = { onRollbackPatch(patch.id) },
+                    isProcessing = state.isProcessing && state.processingPatchId == patch.id,
+                    viewModel = viewModel
+                )
+            }
+        }
+
+        // Empty state helper when no patches in any category
+        if (validatedPatches.isEmpty() && createdPatches.isEmpty() && otherPatches.isEmpty()) {
+            item {
+                Spacer(modifier = Modifier.height(32.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = "No patches",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "No patches available",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Patches will appear here when drift is detected",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
         }
     }
 }

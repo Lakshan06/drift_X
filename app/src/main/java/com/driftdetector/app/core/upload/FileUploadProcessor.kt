@@ -96,13 +96,23 @@ class FileUploadProcessor(
                 )
             }
 
-            val data = parseResult.getOrThrow()
+            val parsedData = parseResult.getOrThrow()
+            val data = parsedData.data
 
             if (data.isEmpty()) {
                 return@withContext Result.failure(Exception("No data found in file"))
             }
 
             Timber.i("✅ Parsed ${data.size} data points with ${data.first().size} features")
+
+            // Log column names if available
+            if (parsedData.columnNames.isNotEmpty()) {
+                Timber.d(
+                    "📋 Column names: ${
+                        parsedData.columnNames.take(5).joinToString(", ")
+                    }${if (parsedData.columnNames.size > 5) "..." else ""}"
+                )
+            }
 
             // Get file statistics for logging
             dataParser.getFileStats(uri)?.let { stats ->
@@ -171,7 +181,10 @@ class FileUploadProcessor(
             // Process model first
             val modelResult = processModelFile(modelUri, modelFileName)
             if (modelResult.isFailure) {
-                return@withContext Result.failure(modelResult.exceptionOrNull()!!)
+                return@withContext Result.failure(
+                    modelResult.exceptionOrNull()
+                        ?: Exception("Failed to process model file: unknown error")
+                )
             }
             
             val model = modelResult.getOrThrow()
@@ -179,7 +192,10 @@ class FileUploadProcessor(
             // Process data with the new model
             val dataResult = processDataFile(dataUri, dataFileName, model.id)
             if (dataResult.isFailure) {
-                return@withContext Result.failure(dataResult.exceptionOrNull()!!)
+                return@withContext Result.failure(
+                    dataResult.exceptionOrNull()
+                        ?: Exception("Failed to process data file: unknown error")
+                )
             }
             
             Timber.i("✅ Successfully processed model and data files")
